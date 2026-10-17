@@ -423,6 +423,8 @@ def cmd_e2e(a) -> int:
          "always-on: enqueue a day_start event") if has_runner else None,
         ("runner", ["runner", "--once"] + mode, False, "always-on: event processed, zero idle calls") if has_runner else None,
         ("demo", ["demo"] + mode, True, "recorded demo transcript"),
+        ("tracks", ["tracks", "--out", str(root / "tracks")], False,
+         "scorecard: every requirement of Done Means Done, Shared Brain, Version N+1"),
         ("usage", ["usage"], False, "calls, tokens, cache hits, latency, cost"),
     ]
     results, warned, failed = [], [], []
@@ -529,8 +531,9 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--mode", choices=["mock", "live", "crusoe"]); s.add_argument("--days", type=int, default=8)
     s.add_argument("--skip-demo", action="store_true"); s.add_argument("--date", help="forecast day YYYY-MM-DD")
     s.set_defaults(fn=cmd_e2e)
-    from greenstove import evolve
+    from greenstove import evolve, tracks
     evolve.register(sub)                          # playbook show|history|before-after, evolve (Version N+1)
+    tracks.register(sub)                          # tracks: requirement-by-requirement scorecard for the 3 tracks
     try:
         from greenstove import runner
         runner.register(sub)                      # runner --once|--watch|status, event ... (always-on)

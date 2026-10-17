@@ -46,6 +46,10 @@ Start with [PLAN.md](PLAN.md). It contains the ordered tasks, six-hour reference
 
 ## Event tracks and sponsor tools
 
+Requirement-by-requirement check of all three tracks: `gsa tracks` (17 checks on real code
+paths, see [docs/tracks.md](docs/tracks.md); latest mock run:
+[tracks-scorecard-mock.md](docs/evidence/tracks-scorecard-mock.md), 17/17 PASS, mock model on the stub world).
+
 | Event item | How Green-Stove Agents uses it | Command | Status |
 | --- | --- | --- | --- |
 | **Shared Brain** (primary track) | Every agent reads a 600-token brief from one shared memory before it works; after it works, a code Keeper admits only notes that match recorded evidence, rejects fabricated numbers and rule changes, keeps conflicts scoped, expires stale entries; frozen for evaluation; fresh agents compared with no memory and raw history on held-out days | `gsa warmup`, `gsa brain show\|audit`, `gsa freeze`, `gsa eval-agents` | Built, tested in mock; live measurement pending |
