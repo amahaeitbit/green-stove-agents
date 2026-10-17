@@ -1,0 +1,39 @@
+{
+  "note": "Hand-calculated. Peak 13/kWh: A = 1 kW x 0.5 h x 13 = 6.50, B = 2 kW x 0.5 h x 13 = 13.00.",
+  "cases": [
+    {
+      "name": "simultaneous: A and B both 18:00-18:30",
+      "plan": "plan-simultaneous.json",
+      "expect": {
+        "passed": false,
+        "peak_load_kw": 3.0,
+        "cooking_energy_kwh": 1.5,
+        "total_spend": 19.5,
+        "feedback": [
+          {
+            "code": "INVERTER_LIMIT",
+            "interval": 72,
+            "end_interval": 74,
+            "request_ids": [
+              "req-A",
+              "req-B"
+            ],
+            "value": 3.0,
+            "limit": 2.0
+          }
+        ]
+      }
+    },
+    {
+      "name": "sequential: A 18:00-18:30, B 18:30-19:00",
+      "plan": "plan-sequential.json",
+      "expect": {
+        "passed": true,
+        "peak_load_kw": 2.0,
+        "cooking_energy_kwh": 1.5,
+        "total_spend": 19.5,
+        "feedback": []
+      }
+    }
+  ]
+}

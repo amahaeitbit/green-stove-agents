@@ -1,0 +1,243 @@
+{
+  "$defs": {
+    "HouseholdRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "request_id": {
+          "minLength": 1,
+          "title": "Request Id",
+          "type": "string"
+        },
+        "household_id": {
+          "minLength": 1,
+          "title": "Household Id",
+          "type": "string"
+        },
+        "power_kw": {
+          "exclusiveMinimum": 0,
+          "title": "Power Kw",
+          "type": "number"
+        },
+        "duration_steps": {
+          "exclusiveMinimum": 0,
+          "maximum": 96,
+          "title": "Duration Steps",
+          "type": "integer"
+        },
+        "preferred_start": {
+          "exclusiveMaximum": 96,
+          "minimum": 0,
+          "title": "Preferred Start",
+          "type": "integer"
+        },
+        "earliest_start": {
+          "exclusiveMaximum": 96,
+          "minimum": 0,
+          "title": "Earliest Start",
+          "type": "integer"
+        },
+        "latest_finish": {
+          "exclusiveMinimum": 0,
+          "maximum": 96,
+          "title": "Latest Finish",
+          "type": "integer"
+        },
+        "max_cost": {
+          "minimum": 0,
+          "title": "Max Cost",
+          "type": "number"
+        },
+        "shift_penalty": {
+          "minimum": 0,
+          "title": "Shift Penalty",
+          "type": "number"
+        },
+        "auto_book": {
+          "default": false,
+          "title": "Auto Book",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "request_id",
+        "household_id",
+        "power_kw",
+        "duration_steps",
+        "preferred_start",
+        "earliest_start",
+        "latest_finish",
+        "max_cost",
+        "shift_penalty"
+      ],
+      "title": "HouseholdRequest",
+      "type": "object"
+    },
+    "TariffWindow": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "start_step": {
+          "exclusiveMaximum": 96,
+          "minimum": 0,
+          "title": "Start Step",
+          "type": "integer"
+        },
+        "end_step": {
+          "exclusiveMinimum": 0,
+          "maximum": 96,
+          "title": "End Step",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "start_step",
+        "end_step"
+      ],
+      "title": "TariffWindow",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "scenario_id": {
+      "minLength": 1,
+      "title": "Scenario Id",
+      "type": "string"
+    },
+    "config_hash": {
+      "minLength": 1,
+      "title": "Config Hash",
+      "type": "string"
+    },
+    "scenario_hash": {
+      "minLength": 1,
+      "title": "Scenario Hash",
+      "type": "string"
+    },
+    "day": {
+      "default": 0,
+      "title": "Day",
+      "type": "integer"
+    },
+    "weather_class": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Weather Class"
+    },
+    "initial_battery_kwh": {
+      "minimum": 0,
+      "title": "Initial Battery Kwh",
+      "type": "number"
+    },
+    "battery_capacity_kwh": {
+      "exclusiveMinimum": 0,
+      "title": "Battery Capacity Kwh",
+      "type": "number"
+    },
+    "reserve_kwh": {
+      "minimum": 0,
+      "title": "Reserve Kwh",
+      "type": "number"
+    },
+    "inverter_kw": {
+      "exclusiveMinimum": 0,
+      "title": "Inverter Kw",
+      "type": "number"
+    },
+    "forecast_pv_kw": {
+      "items": {
+        "type": "number"
+      },
+      "maxItems": 96,
+      "minItems": 96,
+      "title": "Forecast Pv Kw",
+      "type": "array"
+    },
+    "downside_pv_kw": {
+      "items": {
+        "type": "number"
+      },
+      "maxItems": 96,
+      "minItems": 96,
+      "title": "Downside Pv Kw",
+      "type": "array"
+    },
+    "essential_load_kw": {
+      "items": {
+        "type": "number"
+      },
+      "maxItems": 96,
+      "minItems": 96,
+      "title": "Essential Load Kw",
+      "type": "array"
+    },
+    "requests": {
+      "items": {
+        "$ref": "#/$defs/HouseholdRequest"
+      },
+      "title": "Requests",
+      "type": "array"
+    },
+    "windows": {
+      "items": {
+        "$ref": "#/$defs/TariffWindow"
+      },
+      "title": "Windows",
+      "type": "array"
+    },
+    "lattice": {
+      "additionalProperties": {
+        "items": {
+          "type": "number"
+        },
+        "type": "array"
+      },
+      "title": "Lattice",
+      "type": "object"
+    },
+    "tier_order": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Tier Order",
+      "type": "array"
+    },
+    "assumptions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Assumptions",
+      "type": "array"
+    }
+  },
+  "required": [
+    "scenario_id",
+    "config_hash",
+    "scenario_hash",
+    "initial_battery_kwh",
+    "battery_capacity_kwh",
+    "reserve_kwh",
+    "inverter_kw",
+    "forecast_pv_kw",
+    "downside_pv_kw",
+    "essential_load_kw",
+    "requests",
+    "windows",
+    "lattice",
+    "tier_order"
+  ],
+  "title": "ScenarioContext",
+  "type": "object"
+}

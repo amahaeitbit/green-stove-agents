@@ -1,0 +1,20 @@
+{
+  "additionalProperties": false,
+  "description": "Visible only to execution and the evaluator. Rejected by the C0 simulator.",
+  "properties": {
+    "actual_pv_kw": {
+      "items": {
+        "type": "number"
+      },
+      "maxItems": 96,
+      "minItems": 96,
+      "title": "Actual Pv Kw",
+      "type": "array"
+    }
+  },
+  "required": [
+    "actual_pv_kw"
+  ],
+  "title": "ActualScenario",
+  "type": "object"
+}

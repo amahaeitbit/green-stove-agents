@@ -1,0 +1,72 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "request_id": {
+      "minLength": 1,
+      "title": "Request Id",
+      "type": "string"
+    },
+    "household_id": {
+      "minLength": 1,
+      "title": "Household Id",
+      "type": "string"
+    },
+    "power_kw": {
+      "exclusiveMinimum": 0,
+      "title": "Power Kw",
+      "type": "number"
+    },
+    "duration_steps": {
+      "exclusiveMinimum": 0,
+      "maximum": 96,
+      "title": "Duration Steps",
+      "type": "integer"
+    },
+    "preferred_start": {
+      "exclusiveMaximum": 96,
+      "minimum": 0,
+      "title": "Preferred Start",
+      "type": "integer"
+    },
+    "earliest_start": {
+      "exclusiveMaximum": 96,
+      "minimum": 0,
+      "title": "Earliest Start",
+      "type": "integer"
+    },
+    "latest_finish": {
+      "exclusiveMinimum": 0,
+      "maximum": 96,
+      "title": "Latest Finish",
+      "type": "integer"
+    },
+    "max_cost": {
+      "minimum": 0,
+      "title": "Max Cost",
+      "type": "number"
+    },
+    "shift_penalty": {
+      "minimum": 0,
+      "title": "Shift Penalty",
+      "type": "number"
+    },
+    "auto_book": {
+      "default": false,
+      "title": "Auto Book",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "request_id",
+    "household_id",
+    "power_kw",
+    "duration_steps",
+    "preferred_start",
+    "earliest_start",
+    "latest_finish",
+    "max_cost",
+    "shift_penalty"
+  ],
+  "title": "HouseholdRequest",
+  "type": "object"
+}

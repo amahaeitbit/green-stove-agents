@@ -1,0 +1,5 @@
+{
+  "min_service_fraction": 1.0,
+  "max_shift_hours": 3.0,
+  "essential_unserved_kwh": 0.0
+}
