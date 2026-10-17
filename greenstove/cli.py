@@ -143,11 +143,17 @@ def context_for(name: str):
     return ctx
 
 
+def _battery_spec_dict(ctx) -> dict:
+    from greenstove.world_adapter import battery_spec
+    return battery_spec(ctx).model_dump()
+
+
 def admission_variant(ctx):
     """Same scenario under Abel's admission policy: own station hash so memory never mixes worlds."""
     from greenstove.env_protocol import short_hash, with_scenario_hash
     return with_scenario_hash(ctx.model_copy(update={
-        "scenario_id": f"{ctx.scenario_id}-adm", "config_hash": short_hash([ctx.config_hash, "abel-admission-policy"], 12),
+        "scenario_id": f"{ctx.scenario_id}-adm",
+        "config_hash": short_hash([ctx.config_hash, "abel-admission-policy", _battery_spec_dict(ctx)], 12),
         "assumptions": list(ctx.assumptions) + ["evaluated under Abel's battery-backed admission policy"]}))
 
 

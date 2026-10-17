@@ -31,10 +31,12 @@ claimed_passed is true only if every cited evidence record passed."""
 
 def summarize(records: list[EvidenceRecord]) -> list[dict[str, Any]]:
     keep = ("served_fraction", "min_battery_kwh", "unserved_cooking_kwh", "unserved_essential_kwh",
-            "overload_steps", "max_shift_hours", "total_spend")
+            "overload_steps", "max_shift_hours", "total_spend", "admitted_sessions", "deferred_sessions",
+            "pending_approval_sessions")
     return [{
         "evidence_id": r.run_id, "proposal_id": r.proposal_id, "phase": r.phase, "passed": r.passed,
         "tariff": r.tariff, "feedback_codes": r.feedback_codes,
+        "delivered": {s: sum(1 for v in r.outcomes.values() if v == s) for s in sorted(set(r.outcomes.values()))},
         "metrics": {k: r.metrics[k] for k in keep if k in r.metrics},
         "situation": r.situation,
     } for r in records]

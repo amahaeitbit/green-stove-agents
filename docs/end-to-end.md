@@ -51,20 +51,20 @@ Going live:
 4. If the model id is not in the catalog, copy the exact Nemotron id preflight lists into
    `GREENSTOVE_MODEL` in `.env`.
 
-## Checkpoints with commands
+## Checkpoints with commands (status at 15:30 PT)
 
-| Checkpoint | Clock | Owner | Command | Done when |
-| --- | --- | --- | --- | --- |
-| C0 contract | now | both | read `docs/contracts.md` and `docs/agent-layer.md` | world types and protocol agreed; Abel's `models.py` replaces `env_protocol` copies |
-| C1 first path | by 1:15 | partner | `smoke --mode crusoe`, `models`, `bench --mode live` | one real Crusoe response recorded in `data/smoke/`; Nemotron model chosen by measurement and pinned |
-| C1 first path | by 1:15 | Abel | his fixtures | fixed tariff → reservations → trace → verdict on his world |
-| C2 live planning | 1:15–2:00 | partner | `world_adapter.py`, then `plan --scenario dev-overcast-low-battery --brain off --mode crusoe --execute` | real proposals flow through Abel's allocator and verifier; failed checks lead to a new candidate or a reason-coded stop |
-| C3 shared memory | 2:00–2:45 | partner | `warmup --mode crusoe`, `brain show`, `brain audit`, `demo --scene memory`, `demo --scene handoff` | supported notes admitted, fabricated one rejected, fresh agent reads a recorded brief |
-| C4 freeze | 2:45–3:15 | both | `freeze`, plus Abel's manifest | brain snapshot and history hashed; prompts, model, held-out set, budgets locked in `manifest-partner.json` + Abel's `evaluation-manifest.json` |
-| C5 evidence | 3:15–4:00 | partner | `eval-agents --freeze <dir> --mode crusoe` | A/B/C raw records and `agent-summary.md` for all held-out days, failures included |
-| C5 evidence | 3:15–4:00 | Abel | his `eval` | D/E/F added; official table in `docs/results.md` |
-| Feature freeze | 4:00 | both | — | bug fixes only |
-| C6 submission | 4:00–4:50 | both | `demo --mode crusoe --pause`, video, form | live run rehearsed, transcript saved as fallback, video uploaded, form submitted by 4:50 |
+| Checkpoint | Status | Command | Done when |
+| --- | --- | --- | --- |
+| C0 contract | done: agents import Abel's `models.py` | — | shared types, one protocol |
+| C1 first path | mock done; live waiting for the Crusoe key | `smoke --mode live`, `models`, `bench --mode live` | one real Crusoe response recorded; Nemotron chosen by measurement |
+| C2 live planning | mock done on all three worlds | `GREENSTOVE_WORLD=abel-admission gsa plan --scenario dev-clear-full --mode live` | real proposals through Abel's allocator and admission ledger |
+| C3 shared memory | mock done | `warmup`, `brain stats`, `brain explain`, `demo --scene memory/handoff` | supported notes admitted, fabricated rejected, fresh agent reads a brief |
+| C4 freeze | tooling done | `freeze` + Abel's manifest | hashes for brain, history, spec, prompts, model |
+| C5 evidence | tooling done; live pending | `eval-agents`, `compare` (A–F), `report` | six-condition table on held-out days |
+| C6 submission | open | `demo --mode live --pause`, video, form | submitted by 4:50 |
+
+Abel's integration review (`docs/integration-checkpoint-review.md`) and the partner's answers:
+`docs/integration-response.md`.
 
 Demo order, speakers, fallbacks and the video shot list are in
 [demo-runbook.md](demo-runbook.md).
