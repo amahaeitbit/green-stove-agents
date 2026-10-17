@@ -74,6 +74,7 @@ The root Word document, Green-Stove Agents — Problem & Solution.docx, remains 
 | [assumptions.md](docs/assumptions.md) | Synthetic parameters and unvalidated claims |
 | [submission.md](docs/submission.md) | Demo and submission wording |
 | [llm-learnings-and-partner-tools.md](docs/llm-learnings-and-partner-tools.md) | Historical reasoning and proposed integrations |
+| [person-b-plan.md](docs/person-b-plan.md) | Person B (Partner) plan: workstreams, diagram, timeline, demo lines, definition of done |
 | [agent-layer.md](docs/agent-layer.md) | How the agents plug into Abel's world; integration status |
 | [end-to-end.md](docs/end-to-end.md) | The whole pipeline mapped onto checkpoints with clock times |
 | [demo-runbook.md](docs/demo-runbook.md) | Stage commands, timing, speakers, fallbacks, video shot list |

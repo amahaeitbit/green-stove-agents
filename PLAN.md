@@ -100,31 +100,21 @@ Own metric calculation, evidence manifests, summaries and limitations. Keep all 
 
 ## 7. Partner's agents and memory work
 
-### B1. Model path early
+Full plan, diagram, timeline, demo lines and definition of done:
+[docs/person-b-plan.md](docs/person-b-plan.md). Status at 14:10 PT: all of B1–B5 built and
+tested in mock mode (branch `agents-memory`, Abel's C0 world merged); live evidence pending
+the Crusoe key.
 
-Confirm exact Crusoe catalog IDs and supported parameters. Make one real structured request at C1. Pin the model/settings; prefer an available Nemotron route. If Nemotron is unavailable, resolve with sponsor support or transparently use an available Crusoe model without claiming Nemotron use.
+| | Goal | Gate | Proof |
+| --- | --- | --- | --- |
+| **B1. Model path** | One Crusoe adapter; Nemotron id and settings from the live catalog, chosen by measurement and pinned; mock and live; schema validation, one repair, budgets, usage log without keys | C1: one real structured response; model in catalog; bench table | `gsa smoke`, `gsa models`, `gsa bench` |
+| **B2. Bounded planning** | Fresh Pricing Agent proposes lattice-valid prices with cited memory; at most 3 attempts; repeat stop; no relaxation; honest status; an incomplete-coverage pass is never PLAN_VERIFIED; operator decision record | C2: live proposal through Abel's allocator and verifier, new candidate or reason-coded stop | `gsa run`, `gsa decide` |
+| **B3. Shared Brain** | Note-writer reads a relevant brief and proposes; Keeper rebuilds facts from evidence and rejects with the first failing code; ≤20 entries with expiry; conflicts kept scoped; audit never served; 600-token deterministic briefs | C3: supported note admitted, fabricated rejected, stale excluded, fresh agent reads a recorded brief | `gsa brain show\|audit` |
+| **B4. Handoff and evaluation** | Fresh agent per day; frozen brain and history; A/B/C on held-out days with stale-entry counts, cost and cache columns; demo where scene 3's admitted note is scene 4's brief | C4/C5: hashes in the manifest; A/B/C records for every held-out day | `gsa freeze`, `gsa eval-agents`, `gsa demo` |
+| **B5. Extensions** | You.com forecast to solar profile; Version N+1 playbook kept only if it helps; always-on event runner; NemoClaw/OpenShell kit; all outside the headline claim | Labeled separately; never change A/B/C | `gsa forecast`, `gsa evolve`, `gsa runner` |
 
-The adapter supports mock and live modes, timeout, schema validation, limited repair retries, usage records and call/token budgets. Invalid outputs count as attempts; all retries count as calls. Never log credentials. Mock output validates plumbing, not model quality.
-
-### B2. Bounded planning
-
-The Pricing Agent receives current facts, available request constraints, a brief, and current-run feedback. It outputs one lattice-valid tariff and memory references. It cannot set physical limits, alter private preferences or change acceptance requirements. Cap at three proposal attempts, stop on repeated proposals, and emit an honest reason when no plan is verified.
-
-Use fixed requirements from configuration. A Spec Agent is unnecessary for this Shared Brain MVP. No relaxation can turn a failed headline case into success.
-
-### B3. Observation-based memory
-
-Store up to 20 approved observations with evidence IDs, configuration hash, situation descriptors, tariff, forecast and/or execution phase, computed result, and expiry. Preserve successful and failed proposals. The Note-writer proposes candidate IDs/tags and notes duplicate/conflicting observations; the Keeper reconstructs approved factual fields from Abel's run records.
-
-Reject unknown evidence, mismatched metrics, inappropriate scope, expired evidence and attempted constraint edits. A passing scenario does not prove an unrestricted claim. Keep incompatible/conflicting entries separate or exclude them; recency alone cannot establish correctness.
-
-Compile a brief under a fixed memory budget, initially 600 tokens, with IDs/versions. Apply deterministic context matching. Log the entries actually supplied, not just model-reported citations. The Note-writer also reads a bounded relevant brief before proposing updates, so shared memory participates in both roles' work. Store rejections in an audit log without serving them as approved facts.
-
-### B4. Fresh-agent handoff and visible behavior
-
-Instantiate a fresh Pricing Agent request on each independent evaluation day. No hidden conversation history survives beyond declared current-run feedback. During development, Note-writer proposals are admitted for future agents; during evaluation the brain remains frozen. Note-writer output, if generated during evaluation, goes only to a quarantined audit and is never fed back into any condition. Count that overhead separately and consistently across LLM modes, or disable post-run note writing in all of them.
-
-Build a compact terminal or replay view showing requests, reservations, power/reserve trace, observation IDs, proposal and verifier feedback. A selected example illustrates behavior; the full table establishes generalization.
+Everything chains in `gsa e2e [--mode live]`. Remaining for Person B: live key, then
+C1 → C2 → warm-up and freeze → live A/B/C → recorded demo, per the timeline in the full plan.
 
 ## 8. Frozen experiment and success criteria
 
