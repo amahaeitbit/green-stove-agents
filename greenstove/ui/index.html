@@ -649,7 +649,7 @@ async function runAgent(){
   fill($('#agent-body'),loading('Running the Green-Stove agent on '+S.scenarioName+' with memory '+mem+'…'));
   if(isPhone())selectTab('agent');
   await withBusy(btn,'Running…',async()=>{
-    try{const r=await api('/api/run',body);S.run=r;S.runScenario=S.scenarioName;S.runMemory=mem;}
+    try{const r=await api('/api/run',body);S.run=r;S.runScenario=body.scenario;S.runMemory=mem;}   /* not the select's current value */
     finally{renderAgent();}
     renderHouseholds();renderKeeperRun();
     toast('Run finished: '+String((S.run.run||{}).status||'done'),statusKind((S.run.run||{}).status)==='bad'?'info':'ok');
@@ -851,6 +851,7 @@ $('#sel-memory').addEventListener('change',e=>{$('#memory-hint').textContent=MEM
 $('#btn-run').addEventListener('click',runAgent);
 $('#btn-reset').addEventListener('click',()=>withBusy($('#btn-reset'),'Resetting…',async()=>{
   const r=await api('/api/reset',{});S.run=null;S.runScenario=null;S.asks={};
+  S.forecast=null;$('#use-forecast').checked=false;fill($('#fc-result'));   /* server drops the forecast on reset */
   toast('New session '+fmtAny(r&&r.session),'ok');fill($('#note-verdict'));fill($('#nemo-handled'));
   await refreshState();renderAgent();renderKeeperRun();
   await Promise.all([loadScenario(S.scenarioName||$('#sel-scenario').value),refreshBrain(),refreshTools(true)]);}));
@@ -865,7 +866,8 @@ $('#btn-ev-day').addEventListener('click',()=>{const ev={type:'day_start',date:$
 $('#btn-ev-low').addEventListener('click',()=>runnerEvent($('#btn-ev-low'),{type:'telemetry',date:$('#fc-date').value,step:76,battery_kwh:0.6,pv_kw:0.1}));
 $('#btn-drain').addEventListener('click',drain);
 $('#drawer-close').addEventListener('click',()=>$('#drawer').close());
-$('#drawer').addEventListener('click',e=>{if(e.target===e.currentTarget)e.currentTarget.close();});
+$('#drawer').addEventListener('click',e=>{if(e.target!==e.currentTarget)return;const r=e.currentTarget.getBoundingClientRect();
+  if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)e.currentTarget.close();});   /* backdrop only */
 (function(){const d=new Date();d.setDate(d.getDate()+1);$('#fc-date').value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
 
 async function init(){
