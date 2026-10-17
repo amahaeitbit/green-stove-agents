@@ -109,6 +109,9 @@ def run_agent_day(context: ScenarioContext, memory_mode: MemoryMode, requirement
         rec.definition_of_done = {"spec_hash": dod.spec_hash(), "goal": dod.goal,
                                   "checks": [c.model_dump() for c in dod.checks]}
 
+    if hasattr(env, "use_requirements"):              # e.g. admission's shift check uses the day's requirements
+        env.use_requirements(dod_req)
+
     def decide(n: int, what: str, why: str) -> None:
         rec.decisions.append(Decision(attempt=n, decision=what, reason=why))
 

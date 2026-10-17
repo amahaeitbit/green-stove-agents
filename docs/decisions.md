@@ -103,3 +103,13 @@ checks are validated against the verifier's metric vocabulary and can only be st
 the committee's requirements (`code_tightened`, `code_added`). The definition is cached per
 goal + committee + model and frozen into `manifest-partner.json`, so A, B and C use the same
 one. `gsa run --no-spec` reproduces committee-only behavior. Abel to confirm.
+
+## Admission integration (abel-admission world)
+
+Abel's admission policy (defer starts, zero future solar credit, essential demand protected to
+end of day above the floor) is used as written. The partner added the day loop for every phase
+and the energy verdict over the ledger results, so the world has complete coverage; this glue
+is pending Abel's review. DEFER is treated as "not started at the locked time" (no automatic
+re-offer, as Abel's policy requires); the Pricing Agent gets BATTERY_RESERVE feedback and can
+reprice. Under this policy fewer days are feasible (mock brute force: 3 of 7 development/demo
+days and 2 of 8 held-out days have at least one passing tariff).

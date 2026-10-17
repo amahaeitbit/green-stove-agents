@@ -69,6 +69,14 @@ Going live:
 Demo order, speakers, fallbacks and the video shot list are in
 [demo-runbook.md](demo-runbook.md).
 
+## Worlds
+
+| `GREENSTOVE_WORLD` | Households / allocation | Simulation and verdict | Coverage |
+| --- | --- | --- | --- |
+| `stub` (default) | stand-in | stand-in battery model | complete (stand-in, not evidence) |
+| `abel` | Abel's | Abel's C0 simulator and verifier (expected phase, power only) | incomplete: never PLAN_VERIFIED |
+| `abel-admission` | Abel's | Abel's admission ledger for every phase; energy verdict by partner glue | complete, pending Abel's sign-off |
+
 ## Live cost and limits
 
 Rough upper bound per live end-to-end run: smoke 1 call, warmup about 15 calls, held-out

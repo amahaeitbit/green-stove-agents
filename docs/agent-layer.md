@@ -1,5 +1,19 @@
 # Agent layer: integration notes for Abel
 
+**Status 15:03 PT: admission integrated.** `GREENSTOVE_WORLD=abel-admission` runs your
+households, allocator (with the day's `max_shift_hours`) and battery-backed admission ledger
+through a full day for **every phase** (forecast_expected, forecast_downside, actual): at each
+booked start `admission.can_start(...)`, then `advance_interval(...)` with that phase's PV.
+The energy verdict (`AdmissionWorld.verify` in `greenstove/world_adapter.py`) is partner glue
+over your ledger results: inverter, ledger consistency, battery floor, essential load, every
+booked session admitted, service, shift and recomputed quotes (your `billing.quote_for`). Its
+coverage says `complete=True` with scope "admission-energy (Abel ledger; partner verdict glue,
+pending sign-off)". **Please review it before we call anything PLAN_VERIFIED in the submission.**
+`BatterySpec` uses the scenario's capacity and floor (reserve), inverter kW as charge/discharge
+power and 0.95 efficiencies (synthetic). A pre-dawn proof (essential load before PV can cover it
+must come from storage above the floor) makes impossible days INFEASIBLE with zero model calls.
+Your C0 world (`GREENSTOVE_WORLD=abel`) is unchanged.
+
 **Status 13:59 PT:** your branch is merged into `agents-memory` (commit 5f49292). The agent
 layer imports your `greenstove/models.py` types (`env_protocol.py` now re-exports them).
 `GREENSTOVE_WORLD=abel` runs agents on your C0 simulator and verifier

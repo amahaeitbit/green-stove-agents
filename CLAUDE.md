@@ -23,7 +23,8 @@ scripts/setup.sh                          # venv (.venv, Python 3.12 via uv), in
 .venv/bin/python -m pytest -q             # all tests
 .venv/bin/python scripts/c0_check.py      # Abel's checks (also allocator_check.py, admission_check.py)
 .venv/bin/gsa e2e                         # every step, mock model, stand-in world (16 steps)
-GREENSTOVE_WORLD=abel .venv/bin/gsa e2e   # same on Abel's world (C0: power only)
+GREENSTOVE_WORLD=abel .venv/bin/gsa e2e   # same on Abel's C0 world (power only)
+GREENSTOVE_WORLD=abel-admission .venv/bin/gsa e2e   # Abel's allocator + admission ledger, all phases
 .venv/bin/gsa tracks                      # 17 requirement checks for the three tracks
 .venv/bin/gsa demo --pause                # stage demo; see docs/demo-runbook.md
 ```

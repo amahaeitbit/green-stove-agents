@@ -41,8 +41,12 @@ class Environment(Protocol):
 
 def load_environment(prefer_stub: bool = False) -> Environment:
     """GREENSTOVE_WORLD=abel -> Abel's C0 world; otherwise the labeled development stub."""
-    if not prefer_stub and os.environ.get("GREENSTOVE_WORLD", "stub") == "abel":
+    world = os.environ.get("GREENSTOVE_WORLD", "stub")
+    if not prefer_stub and world == "abel":
         from greenstove.world_adapter import AbelC0World
         return AbelC0World()
+    if not prefer_stub and world == "abel-admission":
+        from greenstove.world_adapter import AdmissionWorld
+        return AdmissionWorld()
     from greenstove.stub_env import StubEnvironment
     return StubEnvironment()
