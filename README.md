@@ -2,7 +2,7 @@
 
 A shared memory experiment for household energy coordination at a simulated solar cooking station.
 
-**Status (Oct 17, 14:00 PT):** agent layer, Shared Brain, Crusoe integration, You.com forecast and end-to-end tooling are built and tested (branch `agents-memory`, merged with Abel's C0 world). All runs so far are mock-model runs on a labeled stand-in world or Abel's power-only C0 world; no live Nemotron result and no performance improvement is claimed yet.
+**Integration status (Oct 17):** the combined environment and agent flow on `environment-evidence` passes 308 tests, the acceptance check and the mock end-to-end pipeline. The `abel-admission` world uses independent energy verification and produces household-specific execution records. These checks do not establish live model quality or a memory advantage; see [the integration handoff](docs/environment-integration-ready.md).
 
 ## What we are building
 
@@ -11,6 +11,77 @@ Six to ten synthetic household agents have different appliance powers, cooking d
 A shared brain stores scoped observations of successful and failed attempts. Fresh agents receive relevant observations rather than an ever-growing transcript. A code Keeper reconstructs approved facts from evidence and excludes unsupported or incompatible entries.
 
 Primary hackathon prompt: **Shared Brain**. Fixed verification and honest stopping support Done Means Done. The project does not claim deployed autonomy or Version N+1 strategy evolution.
+
+## How the current system flows
+
+This diagram follows `GREENSTOVE_WORLD=abel-admission`. Household agents use deterministic
+rules; Pricing and Note-writer use the model adapter (mock in the validated runs, or
+Crusoe-hosted models in live mode). Cooking happens on appliances in individual homes.
+
+```mermaid
+flowchart TD
+    INPUT["Household requests + station configuration<br/>Power, cooking windows, budgets, booking authority"]
+    SPEC["Goal + Spec Agent<br/>Code enforces fixed committee limits"]
+    WEATHER["Optional You.com search + model extraction<br/>Cited weather assumptions → synthetic PV profile"]
+
+    subgraph PLAN["1 · Bounded planning — supervisor.py"]
+        SUP["Supervisor<br/>Fixed checks, call limits, loop and drift detection"]
+        BOUND{"Deterministic bound<br/>proves infeasibility?"}
+        PRICE["Pricing Agent<br/>Propose a lattice-valid tariff"]
+        ALLOC["Deterministic household scoring + allocator<br/>Accepted bookings and pending capacity holds"]
+        FORECAST["Shared execution loop<br/>Expected and downside forecast simulations"]
+        VERIFY["Independent admission verifier<br/>Reconstruct decisions, energy balance and completion"]
+        PASS{"Both forecasts and<br/>definition of done pass?"}
+        RETRY{"Another distinct attempt<br/>within the limits?"}
+        STOP["Honest stop + operator notice<br/>INFEASIBLE only with proof;<br/>otherwise NO_VERIFIED_PLAN"]
+        VERIFIED["PLAN_VERIFIED<br/>Select the checked plan"]
+    end
+
+    subgraph EXEC["2 · Actual simulated execution — admission_world.py + acceptance.execute"]
+        ACTUAL["Replay selected plan with actual PV<br/>Check admission at each booked start;<br/>carry one ledger through every interval"]
+        ACTCHECK["Independent actual-phase verification<br/>Completion follows delivered intervals"]
+        RESULT["EXECUTION_COMPLETE record<br/>Explicit outcome_passed and service metrics"]
+        HOUSE["Household-specific records<br/>Start, wait, approval needed, completed or not served<br/>Unstarted accepted sessions finalized at their deadline"]
+    end
+
+    subgraph MEMORY["3 · Shared Brain — development writes; evaluation freezes"]
+        EVIDENCE["Evidence store<br/>Traces, verdicts and per-request outcomes"]
+        WRITER["Note-writer Agent<br/>Propose observations from evidence + relevant brief"]
+        KEEPER["Code Keeper<br/>Check evidence, scope, expiry and conflicts;<br/>reject unsupported notes"]
+        BRAIN["Approved shared observations<br/>Bounded store with provenance"]
+        BRIEF["Brief compiler<br/>Scoped context for a fresh agent"]
+    end
+
+    INPUT --> SUP
+    SPEC --> SUP
+    WEATHER -. "optional input" .-> SUP
+    SUP --> BOUND
+    BOUND -- Yes --> STOP
+    BOUND -- No --> PRICE
+    BRIEF --> PRICE
+    PRICE --> ALLOC --> FORECAST --> VERIFY --> PASS
+    PASS -- No --> RETRY
+    RETRY -- "Yes: verifier feedback" --> PRICE
+    RETRY -- No --> STOP
+    PASS -- Yes --> VERIFIED
+    VERIFIED -- "when actual inputs are supplied" --> ACTUAL
+    ACTUAL --> ACTCHECK --> RESULT --> HOUSE
+    VERIFY --> EVIDENCE
+    ACTCHECK --> EVIDENCE
+    EVIDENCE -- "development only" --> WRITER
+    BRIEF --> WRITER
+    WRITER --> KEEPER --> BRAIN --> BRIEF
+```
+
+Admission reserves enough stored energy for the full cooking session, existing commitments
+and remaining essential demand through day end, above the battery floor. It gives no credit
+to future solar; observed solar can charge the battery. Pending offers cannot start.
+
+Household notices are simulated, in-process records. During evaluation the brain is frozen
+and Note-writer updates are disabled. Facts-only, raw-history and curated-memory agents are
+compared with last-tariff reuse, nearest-context reuse and deterministic search through the
+same environment. NemoClaw/OpenShell packaging and the separate Version N+1 experiment are
+described below; they are outside this core execution diagram.
 
 ## The claim we will test
 
@@ -29,8 +100,9 @@ scripts/setup.sh                                         # install, tests, mock 
                                                          # decide, warm-up, freeze, A/B/C, Version N+1, runner, demo, usage
 ```
 
-Until Abel's world is merged, commands run on a labeled development stand-in
-(`stub-env`), and mock mode is labeled MOCK; neither is evidence. See
+Commands default to a labeled development stand-in (`stub-env`). Set
+`GREENSTOVE_WORLD=abel-admission` to use the combined, independently verified environment.
+Mock mode remains labeled MOCK and does not establish model quality. See
 [docs/end-to-end.md](docs/end-to-end.md), [docs/demo-runbook.md](docs/demo-runbook.md) and
 [docs/agent-layer.md](docs/agent-layer.md).
 
