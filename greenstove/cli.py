@@ -410,6 +410,13 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("e2e", help="smoke, warmup, freeze, held-out A/B/C, recorded demo")
     s.add_argument("--mode", choices=["mock", "live", "crusoe"]); s.add_argument("--days", type=int, default=8)
     s.add_argument("--skip-demo", action="store_true"); s.set_defaults(fn=cmd_e2e)
+    from greenstove import evolve
+    evolve.register(sub)                          # playbook show|history|before-after, evolve (Version N+1)
+    try:
+        from greenstove import runner
+        runner.register(sub)                      # runner --once|--watch|status, event ... (always-on)
+    except ImportError:
+        pass
     a = p.parse_args(argv)
     try:
         return a.fn(a)

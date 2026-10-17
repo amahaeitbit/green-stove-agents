@@ -9,3 +9,4 @@ data/
 *.swp
 .DS_Store
 *.egg-info/
+.claude/
