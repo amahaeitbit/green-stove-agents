@@ -16,6 +16,9 @@ import math
 from .models import (
     STEP_HOURS,
     STEPS,
+    POWER_TOLERANCE_KW,
+    UNSERVED_NOT_OFFERED,
+    UNSERVED_REASONS,
     VERIFIER_VERSION,
     Condition,
     ContractError,
@@ -61,14 +64,42 @@ def _check_trace(trace: Trace, context: ScenarioContext, plan: Plan) -> tuple[li
         if r.accepted:
             for t in range(r.start_step, r.end_step):
                 who[t].append(r.request_id)
-    demand = [round(c + e, 6) for c, e in zip(cooking, context.essential_load_kw)]
+    demand = [math.fsum((c, e)) for c, e in zip(cooking, context.essential_load_kw)]
     for t in range(STEPS):
         if abs(cooking[t] - trace.cooking_kw[t]) > TOL or abs(demand[t] - trace.demand_kw[t]) > TOL:
             raise ContractError(f"trace load at interval {t} disagrees with the plan's reservations")
-    overload = [t for t in range(STEPS) if demand[t] > context.inverter_kw + TOL]
+    overload = [t for t in range(STEPS) if demand[t] > context.inverter_kw + POWER_TOLERANCE_KW]
     if sorted(trace.overload_steps) != overload:
         raise ContractError("trace overload_steps disagree with recomputed loads")
+    _check_unserved(plan, context)
+    # Pending offers consume no energy yet, but promise capacity on approval.
+    # Recompute holds from the plan rather than trusting allocator provenance.
+    held = cooking_profile(plan, include_pending=True)
+    for t, (all_cooking, accepted_cooking, essential) in enumerate(
+        zip(held, cooking, context.essential_load_kw)
+    ):
+        if (all_cooking > accepted_cooking
+                and math.fsum((all_cooking, essential)) > context.inverter_kw + POWER_TOLERANCE_KW):
+            raise ContractError(f"pending capacity holds overbook the inverter at interval {t}")
     return demand, who
+
+
+def _check_unserved(plan: Plan, context: ScenarioContext) -> None:
+    """plan.unserved is informational, so it must also be truthful: known scenario requests,
+    each listed once, never also reserved, with an informational reason only."""
+    known = {r.request_id for r in context.requests}
+    reserved = {r.request_id for r in plan.reservations}
+    seen: set[str] = set()
+    for u in plan.unserved:
+        if u.request_id not in known:
+            raise ContractError(f"unserved entry cites unknown request {u.request_id}")
+        if u.request_id in seen:
+            raise ContractError(f"request {u.request_id} is listed as unserved more than once")
+        if u.request_id in reserved:
+            raise ContractError(f"request {u.request_id} is both reserved and listed as unserved")
+        if u.reason not in UNSERVED_REASONS:
+            raise ContractError(f"unserved reason {u.reason!r} is not one of {UNSERVED_REASONS}")
+        seen.add(u.request_id)
 
 
 def verify(trace: Trace, requirements: Requirements, context: ScenarioContext, plan: Plan) -> Verdict:
@@ -78,7 +109,7 @@ def verify(trace: Trace, requirements: Requirements, context: ScenarioContext, p
     fb: list[Feedback] = []
 
     # Inverter: one feedback per contiguous overloaded range with the same households.
-    over = [t for t in range(STEPS) if demand[t] > limit + TOL]
+    over = [t for t in range(STEPS) if demand[t] > limit + POWER_TOLERANCE_KW]
     groups: list[list[int]] = []
     for t in over:
         if groups and groups[-1][-1] == t - 1 and sorted(who[t - 1]) == sorted(who[t]):
@@ -114,8 +145,14 @@ def verify(trace: Trace, requirements: Requirements, context: ScenarioContext, p
         fb.append(Feedback(code="BUDGET_EXCEEDED", request_id=r.request_id, value=r.locked_cost,
                            limit=reqs[r.request_id].max_cost,
                            message=f"Reservation {r.reservation_id} costs more than the household maximum."))
-    fb += [Feedback(code=u.reason, request_id=u.request_id, message="Unserved by the allocator.")
+    # Informational only (UNSERVED_* codes); the service condition decides pass/fail.
+    fb += [Feedback(code=u.reason, request_id=u.request_id, message="Not booked by the allocator.")
            for u in plan.unserved]
+    # Every scenario request is accounted for: one left out of the allocation entirely gets a code too.
+    listed = {r.request_id for r in plan.reservations} | {u.request_id for u in plan.unserved}
+    fb += [Feedback(code=UNSERVED_NOT_OFFERED, request_id=rid,
+                    message="Not included in this allocation; no reservation or offer was made.")
+           for rid in sorted(set(reqs) - listed)]
 
     shifts = {r.request_id: abs(r.start_step - reqs[r.request_id].preferred_start) * STEP_HOURS for r in accepted}
     max_shift = max(shifts.values(), default=0.0)
@@ -152,7 +189,10 @@ def verify(trace: Trace, requirements: Requirements, context: ScenarioContext, p
         config_hash=context.config_hash,
         scenario_hash=context.scenario_hash,
         phase=trace.phase,
-        passed=all(c.passed for c in conditions) and not fb,
+        # Unserved reasons explain allocation outcomes, not necessarily failed
+        # requirements: a configured service floor may legitimately permit them.
+        # Every enforced requirement above has its own authoritative condition.
+        passed=all(c.passed for c in conditions),
         conditions=conditions,
         metrics={
             "served_fraction": round(served, 6),
@@ -167,6 +207,6 @@ def verify(trace: Trace, requirements: Requirements, context: ScenarioContext, p
         },
         feedback_codes=fb,
         verifier_version=VERIFIER_VERSION,
-        requirements=requirements,
-        coverage=C0_COVERAGE,
+        requirements=requirements.model_copy(deep=True),
+        coverage=C0_COVERAGE.model_copy(deep=True),
     )

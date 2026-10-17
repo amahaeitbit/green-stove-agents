@@ -3,7 +3,7 @@
 **Status 13:59 PT:** your branch is merged into `agents-memory` (commit 5f49292). The agent
 layer imports your `greenstove/models.py` types (`env_protocol.py` now re-exports them).
 `GREENSTOVE_WORLD=abel` runs agents on your C0 simulator and verifier
-(`greenstove/world_adapter.py`; allocation still from the stub). What happens there today:
+(`greenstove/world_adapter.py`; since 818bd91 it also uses your households and allocator). What happens there today:
 the downside phase and actual execution are recorded as "not modeled", a pass with
 `coverage.complete=false` is reported as "checked conditions passed … not a verified plan"
 (never PLAN_VERIFIED), and on `c0-fixture` both households have `auto_book=false`, so your

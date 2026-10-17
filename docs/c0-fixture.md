@@ -130,12 +130,34 @@ small edits:
 
 ## Still open
 
-3. **Allocator tie-break.** Proposed: adopt the stub's rule. Process requests by
+3. **Allocator tie-break (confirmed for the next increment).** Adopt the stub's rule. Process requests by
    `(preferred_start, request_id)`; each household ranks starts by quote +
    `shift_penalty × shift hours`, skipping starts over `max_cost`, ties to the earliest start;
    reserve the best start that fits the inverter limit in every interval.
 
 ## Not in this revision (deliberately)
 
-`INVALID_TARIFF` as a structured verdict (before C2), allocator and household authority (C1), PV,
+`INVALID_TARIFF` as a structured verdict (before C2), manual approval workflow, PV,
 battery and essential load, downside and actual phases, infeasibility bound, observation fixtures.
+
+## Next increment implemented separately
+
+`households.py` and `allocator.py` now generate requests and power-capacity offers using
+the agreed policy. Run `python scripts/allocator_check.py` and
+`python -m unittest discover -s tests -v`. The original hand-built C0 input fixtures and
+numeric expectations remain unchanged; verdict records were regenerated for verifier
+version `c0-power-allocator-4`. The new checker derives separate cases with explicit auto-booking
+authority where needed. Pending offers are not treated as accepted sessions.
+
+The automatic allocator may place B before A: with A fixed at 18:00, B's 17:30 and 18:30
+alternatives have equal cost/inconvenience, so the earliest-start tie-break chooses 17:30.
+That difference from the illustrative C0 sequential plan is expected and still uses
+1.5 kWh before losses. Full C1 completion also needs the remaining environment work and
+the partner's live smoke/integration check; this is the allocator increment only.
+
+Latest independent-review fixes use simulator `c0-power-only-4` and verifier
+`c0-power-allocator-7`; the two traces and two verdicts carry new identities. Input
+fixtures, schemas and expected numeric results are unchanged. Verification now checks
+pending capacity holds as well as accepted consumption, coverage metadata is detached,
+and interval power is not rounded before overload checks. See the review follow-up in
+[allocator-review-handoff.md](allocator-review-handoff.md) for the full chronology.

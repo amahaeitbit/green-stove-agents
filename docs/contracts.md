@@ -73,13 +73,78 @@ implementations with the same name are not an integration agreement.
 
 ## Allocation and quotes
 
-For each proposed tariff, deterministic households rank acceptable starts by cost plus configured shift penalty. Fix the exact score, priority and tie-breaker at C0. The allocator follows that order and checks interval resource feasibility. Refused or unserved requests have explicit codes; no silent acceptance or double allocation.
+The at-home operating model and allocator conventions have been confirmed by Abel with
+the partner. `households.py` and `allocator.py` implement the next power-only increment;
+full energy accounting and agent-layer integration remain pending.
+
+Process requests in two passes, independent of input list order: first all requests with
+`auto_book=true`, then all others, each pass ordered by `(preferred_start, request_id)`.
+Each household ranks in-window starts by `rounded session quote + shift_penalty *
+abs(start - preferred_start) * 0.25`, with the earliest start breaking equal-score ties.
+Penalty is per hour. Reject starts over budget. Select the highest-ranked start that
+fits aggregate inverter capacity in every interval, including explicit essential load.
+Quote and score arithmetic use Decimal internally, with the existing session-total
+half-up rounding rule. These functions do not mutate inputs.
+
+An offer is accepted only if `auto_book=true`. Otherwise it remains `accepted=false`;
+manual approval is not implemented by this allocator. Pending offers are made only from
+capacity left after every auto-booking request (decision D1, option 3) and hold that
+capacity within the current candidate, so a later approval cannot overbook and a pending
+offer cannot displace a household that can cook. They are not dispatched or counted as
+served by the simulator/verifier. The same policy must be used in all comparisons; the
+partner's development stub should adopt the same two-pass order. Holds have no persistent
+lifecycle here: each allocation call builds a fresh candidate.
+
+The verifier independently checks aggregate held capacity (accepted plus pending) from
+the plan. An overbooked pending hold raises ContractError; consumption and service still
+count accepted reservations only. Simulator and verifier classify power overloads using
+the same 1e-9 kW tolerance, retaining unrounded interval loads until presentation.
+Verdicts contain detached deep copies of coverage and requirements metadata so a caller
+cannot modify another verdict or future verification results through a returned object.
+
+Requests must match their authoritative scenario records. Duplicate, unknown or altered
+inputs raise ContractError. Valid requests with no affordable allowed start yield
+`UNSERVED_BUDGET`; affordable requests with no capacity-fitting start yield
+`UNSERVED_CAPACITY`. These two reasons are informational and are the only reasons allowed
+in `plan.unserved`; the verifier rejects unserved entries that cite unknown requests, repeat
+a request, name a request that is also reserved, or use any other reason (ContractError).
+`allocate(..., *, max_shift_hours=None)` takes an optional keyword-only limit; callers pass
+`requirements.max_shift_hours` so the allocator never picks a start the verifier would
+reject for shift. The preferred start always remains a candidate. Invalid tariffs raise
+`ContractError` prefixed `INVALID_TARIFF`;
+conversion to structured agent feedback remains a C2 integration task. Subsets are
+permitted, but the verifier measures service against the full scenario.
+
+This is a deterministic greedy policy, not a globally optimal scheduler. It checks power
+capacity only; it does not establish PV/battery energy availability, battery reserve,
+or complete PLAN_VERIFIED status. It enforces requirements.max_shift_hours only when the
+caller passes it.
+The verifier checks additional requirements after allocation. Separate household
+connection limits and conflicts between multiple appliances in one home are not modeled.
+
+Allocation reasons remain visible even when the configured service floor permits some
+unserved requests. Verdict.passed is determined by condition results, not by an empty
+feedback list. An unserved request is not itself evidence that an accepted reservation
+exceeded budget or capacity. The default service floor still requires all requests.
 
 Cost is the sum of power_kw times 0.25 hours times interval price over the reservation. Quote IDs carry a tariff version. Accepted quotes are locked. Each candidate attempt starts from the same pre-day state; tentative reservations from rejected candidates do not persist. The selected accepted plan is committed only after verification. Intra-day rebooking is outside MVP scope.
 
 ## Feedback codes
 
-Start with INVALID_TARIFF, INVERTER_LIMIT, BATTERY_POWER_LIMIT, BATTERY_RESERVE, ESSENTIAL_UNSERVED, OUTSIDE_WINDOW, BUDGET_EXCEEDED, SERVICE_SHORTFALL, and DUPLICATE_RESERVATION. Include interval/request references and computed values, avoiding unsupported explanations.
+Violations (each backs a failed condition): INVALID_TARIFF, INVERTER_LIMIT (an interval's
+load exceeds the inverter), BATTERY_POWER_LIMIT, BATTERY_RESERVE, ESSENTIAL_UNSERVED,
+OUTSIDE_WINDOW, BUDGET_EXCEEDED (an accepted booking costs more than its household maximum),
+SERVICE_SHORTFALL, and DUPLICATE_RESERVATION.
+
+Informational (never fatal by themselves; the service condition decides): UNSERVED_CAPACITY
+(affordable, but no start fits the remaining capacity), UNSERVED_BUDGET (no allowed start
+is affordable), and UNSERVED_NOT_OFFERED (emitted by the verifier for a scenario request that
+appears in neither the reservations nor the unserved list, e.g. after allocating a subset).
+Only UNSERVED_CAPACITY and UNSERVED_BUDGET may appear in plan.unserved. Every scenario request
+is therefore accounted for in every verdict. A passing verdict may carry informational codes but never a violation code.
+Agents and memory should treat UNSERVED_* as "a household was not booked", not as a failure.
+
+Include interval/request references and computed values, avoiding unsupported explanations.
 
 ## Status semantics
 
@@ -106,3 +171,13 @@ python -m greenstove demo
 ```
 
 Commands become documentation of implemented behavior only after the matching gate passes.
+
+## Household-agent communication boundary
+
+See [household-agent-handoff.md](household-agent-handoff.md). Existing request/plan types
+support structured in-process exchanges. The caller routes each reservation or unserved
+outcome back to the household identified by the authoritative request_id -> household_id
+mapping. A pending offer is not an accepted booking or completed session. The environment
+branch does not implement delivery, a message broker, external agent protocol, or manual
+approval. The partner's adapter/supervisor must wire delivery, preserve identifiers and
+honor coverage.complete before advertising verified grid service.

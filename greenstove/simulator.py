@@ -11,9 +11,12 @@ PV and battery fields are carried but not used; battery_kwh and unserved_cooking
 """
 from __future__ import annotations
 
+import math
+
 from .billing import quote, step_prices
 from .models import (
     SIMULATOR_VERSION,
+    POWER_TOLERANCE_KW,
     STEPS,
     ActualScenario,
     ContractError,
@@ -26,7 +29,7 @@ from .models import (
     tariff_version,
 )
 
-EPS = 1e-9
+EPS = POWER_TOLERANCE_KW
 C0_SUPPORTED_PHASES: tuple[Phase, ...] = ("forecast_expected",)
 
 
@@ -65,13 +68,14 @@ def check_plan(plan: Plan, context: ScenarioContext) -> list[float]:
     return prices
 
 
-def cooking_profile(plan: Plan) -> list[float]:
-    cooking = [0.0] * STEPS
+def cooking_profile(plan: Plan, *, include_pending: bool = False) -> list[float]:
+    """Unrounded interval loads; include pending only for the held-capacity check."""
+    cooking: list[list[float]] = [[] for _ in range(STEPS)]
     for res in plan.reservations:
-        if res.accepted:
+        if res.accepted or include_pending:
             for t in range(res.start_step, res.end_step):
-                cooking[t] += res.power_kw
-    return [round(c, 6) for c in cooking]
+                cooking[t].append(res.power_kw)
+    return [math.fsum(loads) for loads in cooking]
 
 
 def simulate(plan: Plan, context: ScenarioContext, phase: Phase = "forecast_expected",
@@ -85,7 +89,7 @@ def simulate(plan: Plan, context: ScenarioContext, phase: Phase = "forecast_expe
     check_plan(plan, context)
 
     cooking = cooking_profile(plan)
-    demand = [round(c + e, 6) for c, e in zip(cooking, context.essential_load_kw)]
+    demand = [math.fsum((c, e)) for c, e in zip(cooking, context.essential_load_kw)]
     return Trace(
         simulation_id=simulation_id(context, plan, phase, actual),
         scenario_id=context.scenario_id,

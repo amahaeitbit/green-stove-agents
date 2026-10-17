@@ -77,8 +77,10 @@ class TestPlanChecks(unittest.TestCase):
         d["reservations"] = d["reservations"][:1]
         v = self.run_plan(d)
         self.assertFalse(v.passed)
-        self.assertEqual([f.code for f in v.feedback_codes], ["SERVICE_SHORTFALL"])
-        self.assertEqual(v.feedback_codes[0].request_ids, ["req-B"])
+        # req-B was left out of the plan entirely: reported as not offered, and service falls short.
+        self.assertEqual([f.code for f in v.feedback_codes], ["UNSERVED_NOT_OFFERED", "SERVICE_SHORTFALL"])
+        self.assertEqual(v.feedback_codes[0].request_id, "req-B")
+        self.assertEqual(v.feedback_codes[1].request_ids, ["req-B"])
 
     def test_unaccepted_offer_does_not_count_as_served(self):
         d = plan_dict("plan-sequential.json")

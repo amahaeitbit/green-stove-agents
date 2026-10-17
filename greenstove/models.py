@@ -31,8 +31,19 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 STEPS = 96          # 15-minute intervals, 0..95
 STEPS_PER_DAY = STEPS
 STEP_HOURS = 0.25
-SIMULATOR_VERSION = "c0-power-only-3"
-VERIFIER_VERSION = "c0-power-only-3"
+SIMULATOR_VERSION = "c0-power-only-4"
+VERIFIER_VERSION = "c0-power-allocator-7"
+POWER_TOLERANCE_KW = 1e-9  # shared simulator/verifier boundary; never round loads first
+
+# Informational reasons for requests the allocator did not book. These are never failures by
+# themselves: the service condition decides. INVERTER_LIMIT and BUDGET_EXCEEDED are reserved for
+# real violations (an overloaded interval; an accepted booking above its household budget).
+UNSERVED_CAPACITY = "UNSERVED_CAPACITY"   # affordable, but no start fits the capacity left
+UNSERVED_BUDGET = "UNSERVED_BUDGET"       # no allowed start is affordable for the household
+UNSERVED_REASONS = (UNSERVED_CAPACITY, UNSERVED_BUDGET)   # the only reasons allowed in plan.unserved
+# Emitted by the verifier (never the allocator) for a scenario request that appears in neither
+# plan.reservations nor plan.unserved, e.g. after allocating a subset. Also informational.
+UNSERVED_NOT_OFFERED = "UNSERVED_NOT_OFFERED"
 
 Phase = Literal["forecast_expected", "forecast_downside", "actual"]
 FORECAST_PHASES: tuple[Phase, ...] = ("forecast_expected", "forecast_downside")
