@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 
 from rich.console import Console
+from rich.markup import escape
 from rich.panel import Panel
 from rich.table import Table
 
@@ -46,14 +47,14 @@ def show_world(c: Console, ctx: ScenarioContext) -> None:
 
 def show_run(c: Console, ctx: ScenarioContext, run: RunRecord, env: Environment, req: Requirements) -> None:
     if run.brief.entry_ids:
-        c.print(Panel(run.brief.text, title=f"Brief supplied ({run.brief.mode}, {run.brief.tokens}/"
+        c.print(Panel(escape(run.brief.text), title=f"Brief supplied ({run.brief.mode}, {run.brief.tokens}/"
                                             f"{run.brief.budget} tokens)"))
     t = Table("attempt", "prices", "cited memory", "expected", "downside", "feedback")
     for a in run.attempts:
         prices = " ".join(f"{k}={v:g}" for k, v in sorted(a.proposal.prices.items())) if a.proposal else "invalid"
         verdict = ["PASS" if a.passed else "FAIL"] * 2 if a.evidence_ids else ["-", "-"]
         t.add_row(str(a.n), prices, ",".join(a.proposal.cited_observation_ids) if a.proposal else "",
-                  verdict[0], verdict[1], ", ".join(a.feedback or a.validation_errors)[:60])
+                  verdict[0], verdict[1], escape(", ".join(a.feedback or a.validation_errors)[:60]))
     c.print(t)
     tokens = sum(x.prompt_tokens + x.completion_tokens for x in run.calls)
     style = "green" if run.status == "PLAN_VERIFIED" else "red"
@@ -82,7 +83,7 @@ def show_run(c: Console, ctx: ScenarioContext, run: RunRecord, env: Environment,
 def show_notes(c: Console, run: RunRecord) -> None:
     t = Table("keeper decision", "entry", "reasons")
     for n in run.notes:
-        t.add_row(n.action, n.observation_id or "-", "; ".join(n.reasons)[:80])
+        t.add_row(n.action, n.observation_id or "-", escape("; ".join(n.reasons)[:80]))
     c.print(t)
 
 
@@ -123,13 +124,16 @@ def main(a) -> int:
                 show_run(c, pctx, run, env, req)
             else:
                 show_notes(c, run)
-                ev = next((e for e in evidence.all() if e.agent_run_id == run.agent_run_id), None)
-                if ev:
-                    fake = ObservationProposal(evidence_ids=[ev.run_id], situation_tags=[str(ev.situation["weather_class"])],
-                                               description="Prices passed with 0.99 served and 42 kWh spare.")
+                recs = [e for e in evidence.all() if e.agent_run_id == run.agent_run_id
+                        and e.proposal_id == (run.selected_proposal_id or e.proposal_id)]
+                if recs:
+                    pid = recs[-1].proposal_id
+                    ids = [e.run_id for e in recs if e.proposal_id == pid]
+                    fake = ObservationProposal(evidence_ids=ids, situation_tags=[str(recs[-1].situation["weather_class"])],
+                                               description="These prices served 0.99 of meals with 42 kWh spare.")
                     cfg = keeper.KeeperConfig(config_hash=pctx.config_hash, clock=pctx.day)
                     res = keeper.admit(fake, evidence, cfg, brain)
-                    c.print(f"[magenta]TEST INJECTION[/] fabricated note -> [bold]{res.action}[/]: {'; '.join(res.reasons)}")
+                    c.print(f"[magenta]TEST INJECTION[/] fabricated note -> [bold]{res.action}[/]: {escape('; '.join(res.reasons))}")
                 c.print(f"brain now: {len(brain.entries())} entries · snapshot {brain.snapshot_hash()[:8]}")
         elif scene == "handoff":
             rows = []

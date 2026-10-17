@@ -94,22 +94,33 @@ def propose(context: ScenarioContext, brief: Brief, feedback: list[dict[str, Any
 _PAIR = re.compile(r"\b([a-z_]+)=(\d+(?:\.\d+)?)\b")
 
 
-def _memory_tariffs(brief_text: str, names: set[str]) -> tuple[list[tuple[str, dict]], set[tuple]]:
-    """Parse brief lines into (id, tariff) known to pass, and tariffs known to fail."""
-    passed: list[tuple[str, dict]] = []
-    failed: set[tuple] = set()
+def _memory_entries(brief_text: str, names: set[str]) -> list[tuple[str, dict, bool, set[str]]]:
+    """Brief lines in order (closest situation first): (id, tariff, passed, codes)."""
+    out = []
     for line in brief_text.splitlines():
         prices = {k: float(v) for k, v in _PAIR.findall(line) if k in names}
         if set(prices) != names:
             continue
-        key = tuple(sorted(prices.items()))
-        is_fail = bool(re.search(r"\bFAIL\b|passed=False|\bfail\b", line))
-        is_pass = bool(re.search(r"\bPASS\b|passed=True|\bpass\b", line))
-        if is_fail:
-            failed.add(key)
-        elif is_pass:
-            passed.append((line.split()[0], prices))
-    return [(i, p) for i, p in passed if tuple(sorted(p.items())) not in failed], failed
+        failed = bool(re.search(r"\bFAIL\b|passed=False|\bfail\b", line))
+        passed = not failed and bool(re.search(r"\bPASS\b|passed=True|\bpass\b", line))
+        if failed or passed:
+            codes = set(re.findall(r"\b[A-Z]+(?:_[A-Z]+)+\b", line))
+            out.append((line.split()[0], prices, passed, codes))
+    return out
+
+
+def _adjust(prices: dict, codes: set[str], lattice: dict, order: list[str]) -> dict:
+    prices, cheap, dear = dict(prices), order[0], order[-1]
+    if codes & {"BATTERY_RESERVE", "INVERTER_LIMIT", "ESSENTIAL_UNSERVED"}:
+        prices[dear] = _step(lattice[dear], prices[dear], +1)
+        prices[cheap] = _step(lattice[cheap], prices[cheap], -1)
+    if "BUDGET_EXCEEDED" in codes:
+        prices[dear] = _step(lattice[dear], prices[dear], -1)
+    if codes == {"SERVICE_SHORTFALL"}:
+        prices[cheap] = _step(lattice[cheap], prices[cheap], -1)
+    for n in order[1:-1]:
+        prices[n] = max(prices[n], prices[cheap])
+    return prices
 
 
 def _step(lattice: list[float], price: float, delta: int) -> float:
@@ -118,37 +129,40 @@ def _step(lattice: list[float], price: float, delta: int) -> float:
 
 
 def mock_pricing(payload: dict[str, Any]) -> dict[str, Any]:
+    """Closest verified pass among the top 3 memory entries, else adjust from the closest failure."""
     lattice = {w["name"]: w["allowed_prices"] for w in payload["windows"]}
-    order = payload["tier_order"]
-    names = set(lattice)
-    good, bad = _memory_tariffs(payload["shared_memory_brief"], names)
-    tried = {tuple(sorted(a["prices"].items())) for a in payload["earlier_attempts_today"] if a.get("prices")}
+    order, names = payload["tier_order"], set(lattice)
+    entries = _memory_entries(payload["shared_memory_brief"], names)
+    attempts = payload["earlier_attempts_today"]
+    tried = {tuple(sorted(a["prices"].items())) for a in attempts if a.get("prices")}
+    key = lambda p: tuple(sorted(p.items()))  # noqa: E731
     cited: list[str] = []
-    if payload["earlier_attempts_today"]:
-        last = payload["earlier_attempts_today"][-1]
-        prices = dict(last.get("prices") or {n: lattice[n][len(lattice[n]) // 2] for n in names})
+    if attempts:
+        last = attempts[-1]
+        base = last.get("prices") or {n: lattice[n][len(lattice[n]) // 2] for n in names}
         codes = {c for r in last.get("results", []) for c in r.get("codes", [])} | set(last.get("errors_codes", []))
-        cheap, dear = order[0], order[-1]
-        if codes & {"BATTERY_RESERVE", "INVERTER_LIMIT", "ESSENTIAL_UNSERVED"}:
-            prices[dear] = _step(lattice[dear], prices[dear], +1)
-            prices[cheap] = _step(lattice[cheap], prices[cheap], -1)
-        if "BUDGET_EXCEEDED" in codes:
-            prices[dear] = _step(lattice[dear], prices[dear], -1)
-        if codes == {"SERVICE_SHORTFALL"}:
-            prices[cheap] = _step(lattice[cheap], prices[cheap], -1)
-        for n in order[1:-1]:
-            prices[n] = max(prices[n], prices[order[0]])
-        if tuple(sorted(prices.items())) in tried | bad:
-            mid = order[len(order) // 2]
-            prices[mid] = _step(lattice[mid], prices[mid], +1)
+        prices = _adjust(base, codes, lattice, order)
         rationale = f"Adjusted after {sorted(codes) or 'no codes'} on the previous attempt."
-    elif good:
-        cited = [good[0][0]]
-        prices = good[0][1]
-        rationale = f"Reused the closest verified observation {cited[0]}."
     else:
-        prices = {n: lattice[n][len(lattice[n]) // 2] for n in names}
-        if tuple(sorted(prices.items())) in bad:
-            prices[order[-1]] = _step(lattice[order[-1]], prices[order[-1]], +1)
-        rationale = "No applicable memory; starting from mid-lattice prices."
+        failed_closer: set[tuple] = set()
+        choice = None
+        for eid, p, passed, _ in entries[:3]:
+            if passed and key(p) not in failed_closer:
+                choice = (eid, p)
+                break
+            if not passed:
+                failed_closer.add(key(p))
+        if choice:
+            cited, prices = [choice[0]], dict(choice[1])
+            rationale = f"Reused the closest verified observation {choice[0]}."
+        elif entries:
+            eid, p, _, codes = entries[0]
+            cited, prices = [eid], _adjust(p, codes, lattice, order)
+            rationale = f"Closest memory {eid} failed with {sorted(codes)}; adjusted away from it."
+        else:
+            prices = {n: lattice[n][len(lattice[n]) // 2] for n in names}
+            rationale = "No applicable memory; starting from mid-lattice prices."
+    if key(prices) in tried:
+        mid = order[len(order) // 2]
+        prices[mid] = _step(lattice[mid], prices[mid], +1)
     return {"prices": prices, "cited_observation_ids": cited, "rationale": rationale}

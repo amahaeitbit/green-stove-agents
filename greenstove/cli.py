@@ -110,7 +110,8 @@ def cmd_warmup(a) -> int:
         run = supervisor.run_agent_day(ctx, "curated", DEFAULT_REQUIREMENTS, env=env, llm=llm, evidence=evidence,
                                        brain=brain, actual=make_actual(ctx, seed=ctx.day + 7))
         notes = ", ".join(f"{n.action}:{n.observation_id or '-'}" for n in run.notes)
-        console.print(f"{name:32} {run.status:17} attempts={len(run.attempts)} calls={len(run.calls)} notes=[{notes}]")
+        console.print(f"{name:32} {run.status:17} attempts={len(run.attempts)} calls={len(run.calls)} notes=[{notes}]",
+                      markup=False)
     console.print(f"brain: {len(brain.entries())} entries, snapshot {brain.snapshot_hash()[:8]}")
     return 0
 
@@ -124,12 +125,12 @@ def cmd_brain(a) -> int:
         return 0
     if a.action == "audit":
         for ev in brain.audit_log()[-a.limit:]:
-            console.print(json.dumps(ev, default=str))
+            console.print(json.dumps(ev, default=str), markup=False)
         return 0
     for e in brain.entries():
         console.print(f"{e.id} v{e.version} [{e.status}] {e.phase} {'PASS' if e.outcome_passed else 'FAIL'} "
                       f"{e.tariff} codes={e.feedback_codes} day {e.created_at}->{e.expires_at} "
-                      f"evidence={len(e.evidence_ids)} {e.conflict_group or ''}")
+                      f"evidence={len(e.evidence_ids)} {e.conflict_group or ''}", markup=False)
     return 0
 
 
