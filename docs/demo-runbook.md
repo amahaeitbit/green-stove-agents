@@ -10,6 +10,7 @@ one-minute video. Segment owners follow [submission.md](submission.md). Commands
 | --- | --- | --- |
 | Crusoe Managed Inference (live model) | Real Pricing Agent and Note-writer calls, with request ids, tokens and latency | `smoke --mode crusoe`, `demo --mode crusoe` |
 | Nemotron (exact id from `/v1/models`) | The model behind both agent roles | printed in the banner of every command |
+| Crusoe catalog, benchmark, usage | Exact Nemotron ids and pricing; model chosen by measured valid outputs, latency and cost; total cost, cache hit rate and latency after the run | `gsa models`, `gsa bench --mode live`, `gsa usage` (see [crusoe.md](crusoe.md)) |
 | Terminal demo (`rich`) | World, attempts and verdicts, reservations, demand and battery strips, Keeper decisions, brief, fresh-agent comparison, infeasibility proof | `python -m greenstove demo` |
 | Shared Brain tools | Entries, versions, expiry, conflict groups; audit log of admissions and rejections | `brain show`, `brain audit` |
 | Setup and readiness | Install, tests, mock smoke; PASS/WARN/FAIL table for key, spend flag, model id, world, brain, tests, git | `scripts/setup.sh`, `preflight` |
@@ -32,7 +33,8 @@ Q&A prop: `gsa decide` shows the full decision an operator would get for one day
    It checks the key (length only), the spend flag, the model id in Crusoe's catalog, which
    world is loaded, the brain, the tests and git.
 4. `python -m greenstove smoke --mode crusoe`: one valid proposal, recorded under
-   `data/smoke/` with request id, tokens and latency.
+   `data/smoke/` with request id, tokens and latency. Then `gsa models` and
+   `gsa bench --mode live --n 3`, and pin the winning Nemotron id in `GREENSTOVE_MODEL`.
 5. Optional: `python -m greenstove warmup --mode crusoe` and `brain show`. The demo itself
    starts from a fresh memory workspace, so the observation the Keeper admits in the
    memory scene is exactly what the fresh agent reads in the handoff scene.

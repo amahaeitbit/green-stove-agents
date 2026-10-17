@@ -49,7 +49,7 @@ alternatives, cost, and what the model was not allowed to decide.
 | Keeper order: evidence_unknown → evidence_expired (config hash) → result_mismatch → scope → constraint_edit → duplicate → conflict; first failure rejects with that code | Same order; `AdmissionResult.code` is the first failing stage, details follow | Matched. A duplicate does not create a new entry; independent new evidence confirms the existing one (version and expiry), code `duplicate` |
 | `store.py`: `approved.jsonl` (cap 20, successes + failures, expiry), `audit.jsonl` (never served), frozen at C4 | Same files, plus `meta.json` (frozen flag, snapshot hash) | Matched |
 | `briefs.py`: deterministic match on weather class, SOC bucket, demand, flexibility, config hash; 600-token cap; logs ids/versions; A [] · B raw rows · C approved obs | Same; distance weights are constants in `briefs.py` | Matched |
-| Crusoe: same model across A/B/C | One model id from `.env`, recorded in every call and in the manifest | Matched |
+| Crusoe: same model across A/B/C | Model per role from `.env` (default one model for all roles), chosen with `gsa bench`, recorded in every call and in the manifest; catalog features (structured output, thinking, caching, pricing) used as described in [crusoe.md](crusoe.md) | Matched; routing never differs between A, B and C |
 | Stretch: NemoClaw / OpenShell sandbox | Not built | Only after C3 passes, per PLAN.md |
 | You.com (PLAN.md: Abel, stretch) | Built by the partner at the user's request: `gsa forecast` (You.com Web Search → Nemotron extraction → verified quote → PV profile) and `--forecast` on `plan`/`run`/`decide` | Forecast records are inputs to a day, saved and frozen; evaluation never runs a live search; Abel to review |
 

@@ -87,10 +87,15 @@ def run_conditions(names: list[str], contexts: Callable, actuals: Callable, requ
     return runs
 
 
+def _usd(rs: list[RunRecord]) -> str:
+    costs = [c.cost_usd for r in rs for c in r.calls if c.cost_usd is not None]
+    return f"{sum(costs) / len(rs):.5f}" if costs else "n/a"
+
+
 def summarize(runs: list[RunRecord], out: Path, header: dict[str, Any]) -> str:
-    rows = ["| Condition | Verified | First candidate | Exec pass | Calls/day | Tokens/day | "
+    rows = ["| Condition | Verified | First candidate | Exec pass | Calls/day | Tokens/day | Cached % | USD/day | "
             "Candidate checks/day | Simulator runs/day | Mean served (actual) |",
-            "| --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
+            "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
     for mode in MODES:
         rs = [r for r in runs if r.memory_mode == mode]
         if not rs:
@@ -104,6 +109,8 @@ def summarize(runs: list[RunRecord], out: Path, header: dict[str, Any]) -> str:
         rows.append(f"| {LABEL[mode]} | {ver}/{n} | {first}/{n} | {exe}/{n} | "
                     f"{mean([len(r.calls) for r in rs]):.2f} | "
                     f"{mean([sum(c.prompt_tokens + c.completion_tokens for c in r.calls) for r in rs]):.0f} | "
+                    f"{100 * sum(c.cached_tokens for r in rs for c in r.calls) / max(1, sum(c.prompt_tokens for r in rs for c in r.calls)):.0f} | "
+                    f"{_usd(rs)} | "
                     f"{mean([r.candidate_evaluations for r in rs]):.2f} | {mean([r.simulator_runs for r in rs]):.2f} | "
                     f"{mean(served):.2f} |")
     lines = ["# Partner-side A/B/C summary", "",
@@ -124,7 +131,10 @@ def summarize(runs: list[RunRecord], out: Path, header: dict[str, Any]) -> str:
 def manifest_fragment(freeze_info: dict, names: list[str], requirements: Requirements, llm: LLMClient,
                       env: Environment, config_hash: str, max_attempts: int = 3, brief_budget: int = 600) -> dict:
     return {"partner": {
-        "commit": git_commit(), "llm": {"mode": llm.s.mode, **llm.s.public()},
+        "commit": git_commit(),
+        "llm": {"mode": llm.s.mode, **llm.s.public(),
+                "models_by_role": {r: llm.s.model_for(r) for r in ("pricing", "note_writer", "forecast_extractor")},
+                "thinking_by_role": dict(llm.s.thinking), "structured": llm.s.structured},
         "prompt_hashes": {"pricing": stable_hash(pricing_agent.SYSTEM), "note_writer": stable_hash(note_writer.SYSTEM)},
         "memory": freeze_info, "modes": list(MODES), "held_out": names, "max_attempts": max_attempts,
         "brief_token_budget": brief_budget, "requirements": requirements.model_dump(), "world": env.name,

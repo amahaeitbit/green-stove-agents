@@ -52,7 +52,7 @@ Going live:
 | Checkpoint | Clock | Owner | Command | Done when |
 | --- | --- | --- | --- | --- |
 | C0 contract | now | both | read `docs/contracts.md` and `docs/agent-layer.md` | world types and protocol agreed; Abel's `models.py` replaces `env_protocol` copies |
-| C1 first path | by 1:15 | partner | `smoke --mode crusoe` | one real Crusoe response recorded in `data/smoke/`, exact model id confirmed |
+| C1 first path | by 1:15 | partner | `smoke --mode crusoe`, `models`, `bench --mode live` | one real Crusoe response recorded in `data/smoke/`; Nemotron model chosen by measurement and pinned |
 | C1 first path | by 1:15 | Abel | his fixtures | fixed tariff → reservations → trace → verdict on his world |
 | C2 live planning | 1:15–2:00 | partner | `world_adapter.py`, then `plan --scenario dev-overcast-low-battery --brain off --mode crusoe --execute` | real proposals flow through Abel's allocator and verifier; failed checks lead to a new candidate or a reason-coded stop |
 | C3 shared memory | 2:00–2:45 | partner | `warmup --mode crusoe`, `brain show`, `brain audit`, `demo --scene memory`, `demo --scene handoff` | supported notes admitted, fabricated one rejected, fresh agent reads a recorded brief |
@@ -81,6 +81,9 @@ You.com search and Nemotron extraction to produce a verified forecast record and
 and `gsa decide --forecast <file>` plans that day with it. Needs `YDC_API_KEY`
 (`scripts/set_crusoe_key.py --var YDC_API_KEY`). Held-out evaluation keeps using frozen
 scenarios; forecasts are never fetched live during evaluation.
+
+Crusoe features used and how they are measured: [crusoe.md](crusoe.md). After any live run,
+`gsa usage` reports calls, tokens, cache hits, latency and cost by role and model.
 
 ## What each run leaves behind
 

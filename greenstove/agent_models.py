@@ -133,6 +133,12 @@ class CallRecord(_Strict):
     request_id: str | None = None
     outcome: Literal["ok", "repaired", "invalid", "error", "budget"]
     error: str | None = None
+    cached_tokens: int = 0                           # Crusoe prompt cache hits (usage.prompt_tokens_details)
+    reasoning_tokens: int = 0                        # thinking tokens when enabled for the role
+    cost_usd: float | None = None                    # from /v1/models pricing or env override
+    response_format: str | None = None               # json_schema | json_object | None
+    ratelimit_remaining_requests: int | None = None
+    ratelimit_remaining_tokens: int | None = None
 
 
 class AttemptRecord(_Strict):

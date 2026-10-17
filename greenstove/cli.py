@@ -195,6 +195,55 @@ def cmd_forecast(a) -> int:
     return 0 if rec.status == "VERIFIED" else 3
 
 
+def _table(rows: list[dict], title: str | None = None) -> None:
+    if not rows:
+        console.print("(no rows)")
+        return
+    t = Table(*rows[0].keys(), title=title)
+    for r in rows:
+        t.add_row(*(escape("" if v is None else str(v)) for v in r.values()))
+    console.print(t)
+
+
+def cmd_models(a) -> int:
+    """Crusoe /v1/models: exact ids, Nemotron first, supported parameters and pricing (listing is free)."""
+    from greenstove import crusoe
+    llm = make_llm("crusoe")
+    models = llm.list_models()
+    path = crusoe.save_catalog(models, data_dir() / "crusoe")
+    _table(crusoe.catalog_rows(models), title=f"Crusoe catalog ({len(models)} models)")
+    console.print(f"pinned: GREENSTOVE_MODEL={llm.s.model} (pricing role: {llm.s.model_for('pricing')}) · saved {path.relative_to(ROOT)}")
+    return 0 if any(m.get("id") == llm.s.model_for("pricing") for m in models) else 1
+
+
+def cmd_bench(a) -> int:
+    """Same pricing task on each model: valid outputs, latency, tokens, cost. Pick by evidence."""
+    from greenstove import crusoe
+    llm = make_llm(a.mode)
+    ids = [m.strip() for m in a.models.split(",")] if a.models else None
+    if ids is None:
+        cat = llm.ensure_catalog() if llm.s.mode == "crusoe" else {}
+        ids = [i for i in cat if "nemotron" in i.lower() and "omni" not in i.lower() and "voice" not in i.lower()] or [llm.s.model]
+    rows = crusoe.bench(llm, ids, context_for(a.scenario), n=a.n)
+    _table(rows, title=f"Pricing Agent benchmark · {a.scenario} · {a.n} runs per model · {llm.s.mode}")
+    out = data_dir() / "crusoe" / f"bench-{time.strftime('%Y%m%d-%H%M%S')}.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(rows, indent=1))
+    console.print(f"saved {out.relative_to(ROOT)} · pin the winner with GREENSTOVE_MODEL (same model for A/B/C)")
+    return 0
+
+
+def cmd_usage(a) -> int:
+    from greenstove import crusoe
+    path = Path(a.file) if a.file else data_dir() / "usage.jsonl"
+    if not path.exists():
+        console.print(f"no usage log at {path}")
+        return 1
+    _table(crusoe.usage_rows(path), title=f"Model usage · {path}")
+    console.print("cross-check live runs: https://console.crusoecloud.com/foundry/metrics")
+    return 0
+
+
 def cmd_preflight(a) -> int:
     """Readiness for an end-to-end or live demo run. Prints no secrets."""
     import subprocess
@@ -336,6 +385,14 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--lon", type=float, default=38.9251); s.add_argument("--tz", type=float, default=3.0)
     s.add_argument("--date", help="YYYY-MM-DD (default tomorrow)"); s.add_argument("--kwp", type=float, default=3.0)
     s.add_argument("--mode", choices=["mock", "live", "crusoe"]); s.set_defaults(fn=cmd_forecast)
+    s = sub.add_parser("models", help="Crusoe catalog: ids, supported parameters, pricing")
+    s.set_defaults(fn=cmd_models)
+    s = sub.add_parser("bench", help="benchmark models on the same Pricing Agent task")
+    s.add_argument("--models", help="comma-separated ids (default: Nemotron text models in the catalog)")
+    s.add_argument("--n", type=int, default=3); s.add_argument("--scenario", default="dev-overcast-low-battery")
+    s.add_argument("--mode", choices=["mock", "live", "crusoe"]); s.set_defaults(fn=cmd_bench)
+    s = sub.add_parser("usage", help="calls, tokens, cache hits, latency and cost by role and model")
+    s.add_argument("--file"); s.set_defaults(fn=cmd_usage)
     s = sub.add_parser("preflight"); s.add_argument("--mode", choices=["mock", "live", "crusoe"]); s.set_defaults(fn=cmd_preflight)
     s = sub.add_parser("freeze"); s.add_argument("--out"); s.set_defaults(fn=cmd_freeze)
     s = sub.add_parser("eval-agents", help="conditions A/B/C on held-out days with frozen memory")
