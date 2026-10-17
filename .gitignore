@@ -8,3 +8,4 @@ __pycache__/
 data/
 *.swp
 .DS_Store
+*.egg-info/
