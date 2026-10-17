@@ -64,7 +64,8 @@ label.field>select,label.field>input,label.field>textarea{color:var(--ink);font-
 header.top{background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
 .top-inner{max-width:1600px;margin:0 auto;padding:10px 16px;display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center}
 .brand{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-width:0}
-.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-left:auto;min-width:0}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start;margin-left:auto;min-width:0}
+.controls>.btn{margin-top:21px}
 .controls label.field{min-width:0}
 .controls select{max-width:280px}
 .hint{font-size:11.5px;color:var(--muted);font-weight:400;max-width:260px}
@@ -77,7 +78,7 @@ main{max-width:1600px;margin:0 auto;padding:16px;display:grid;gap:16px;grid-temp
 .panel-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
 .panel-head .sub{font-size:12.5px;color:var(--muted)}
 #panel-tools{grid-column:1/-1}
-.tools-grid{display:grid;gap:14px;grid-template-columns:repeat(3,minmax(0,1fr))}
+.tools-grid{display:grid;gap:14px;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr)}
 @media (max-width:1279px){
   main{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
   #panel-brain{grid-column:1/-1}
@@ -86,11 +87,13 @@ main{max-width:1600px;margin:0 auto;padding:16px;display:grid;gap:16px;grid-temp
 @media (max-width:760px){
   .top-inner{padding:10px 16px}
   .controls{margin-left:0;width:100%}
-  .controls label.field{flex:1 1 140px}
+  header.top{position:static}
+  .controls label.field{flex:1 1 100%}
+  .controls>.btn{margin-top:0}
   .controls select{max-width:none;width:100%}
   .hint{max-width:none}
-  nav.tabs{display:flex;gap:4px;overflow-x:auto;padding:8px 16px 0;max-width:100%;position:sticky;z-index:15;background:var(--bg)}
-  nav.tabs button{flex:1 0 auto;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:6px 12px;font-weight:650;font-size:13px;cursor:pointer;color:var(--muted)}
+  nav.tabs{display:flex;flex-wrap:wrap;gap:4px;padding:8px 16px;max-width:100%;position:sticky;top:0;z-index:15;background:var(--bg)}
+  nav.tabs button{flex:1 1 calc(50% - 4px);border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:6px 12px;font-weight:650;font-size:13px;cursor:pointer;color:var(--muted)}
   nav.tabs button[aria-selected=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
   main{grid-template-columns:minmax(0,1fr);padding:12px 16px 80px}
   .panel{display:none;padding:14px}
@@ -119,7 +122,7 @@ tr.chosen td{background:var(--ok-bg)}
 .facts b{color:var(--ink);font-weight:650}
 .bar{position:relative;height:20px;background:var(--mut-bg);border-radius:6px;overflow:hidden;margin-top:4px}
 .bar .seg{position:absolute;top:0;bottom:0}
-.bar .seg.window{background:var(--info-bg);border-left:2px solid var(--info);border-right:2px solid var(--info)}
+.bar .seg.window{background:var(--info-bg);background:color-mix(in srgb,var(--info) 22%,transparent);border-left:2px solid var(--info);border-right:2px solid var(--info)}
 .bar .seg.pref{top:4px;bottom:4px;background:var(--c1);border-radius:4px;opacity:.85}
 .bar .seg.book{top:4px;bottom:4px;background:var(--c3);border-radius:4px;box-shadow:0 0 0 2px var(--panel)}
 .bar .seg.win{border-right:1px solid var(--panel);display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:650;color:var(--ink);overflow:hidden;white-space:nowrap}
