@@ -135,7 +135,22 @@ def context_for(name: str):
     if name == "c0-fixture":                      # Abel's C0 fixture (two households, 2 kW inverter)
         from greenstove.io import load_context
         return load_context(ROOT / "fixtures" / "c0" / "context.json")
-    return infeasible_context() if name == "infeasible" else scenario(name)
+    ctx = infeasible_context() if name == "infeasible" else scenario(name)
+    if os.environ.get("GREENSTOVE_WORLD") == "abel":
+        ctx = c0_compatible(ctx)
+    return ctx
+
+
+def c0_compatible(ctx):
+    """Abel's C0 world models cooking only: drop the essential load, give the variant its own
+    station hash (memory never mixes it with the full scenarios) and say so in the context."""
+    from greenstove.env_protocol import short_hash, with_scenario_hash
+    if not any(ctx.essential_load_kw):
+        return ctx
+    return with_scenario_hash(ctx.model_copy(update={
+        "scenario_id": f"{ctx.scenario_id}-c0", "essential_load_kw": [0.0] * len(ctx.essential_load_kw),
+        "config_hash": short_hash([ctx.config_hash, "c0-no-essential-load"], 12),
+        "assumptions": list(ctx.assumptions) + ["C0-compatible variant: essential load removed for Abel's power-only world"]}))
 
 
 def stores() -> tuple[EvidenceStore, BrainStore]:
@@ -380,7 +395,7 @@ def cmd_eval_agents(a) -> int:
     freeze_dir = Path(a.freeze)
     info = json.loads((freeze_dir / "freeze.json").read_text())
     dod = current_spec(llm, scenarios.DEFAULT_REQUIREMENTS)          # frozen: same for A, B and C
-    runs = agent_eval.run_conditions(names, scenarios.scenario, scenarios.actual_for, scenarios.DEFAULT_REQUIREMENTS,
+    runs = agent_eval.run_conditions(names, context_for, scenarios.actual_for, scenarios.DEFAULT_REQUIREMENTS,
                                      env=env, llm=llm, freeze_dir=freeze_dir, out=out,
                                      log=lambda s: console.print(s, markup=False), dod=dod)
     header = {"model": llm.s.public()["model"] if llm.s.mode == "crusoe" else "mock-rules (MOCK)",
@@ -442,8 +457,13 @@ def cmd_e2e(a) -> int:
         if code != 0 and required:
             failed.append(name)
             break
+    checked = len(list(root.glob("**/runs/*/verdict_*.json")))
+    unmodeled = len(list(root.glob("**/runs/*/unmodeled_*.json")))
+    coverage = (f"World coverage: {checked} simulations checked, {unmodeled} phases the world could not model"
+                + (" (results on this world are partial and are not evidence)" if unmodeled else ""))
     lines = [f"# End-to-end run {stamp}", "", f"Model: {'LIVE Crusoe' if live else 'MOCK (rule-based stand-in)'} · "
-             f"world: {load_environment().name} · forecast day {day}", "", "| Step | Status | Shows |", "| --- | --- | --- |"]
+             f"world: {load_environment().name} · forecast day {day}", "", coverage, "",
+             "| Step | Status | Shows |", "| --- | --- | --- |"]
     lines += [f"| {n} | {s} | {w} |" for n, s, w in results]
     lines += ["", "Outputs: smoke/, crusoe/, forecast/, evidence/ (runs, decision.md), brain/, freeze/, eval/, playbook/, "
               "events/, demo/, usage.jsonl"]
@@ -451,6 +471,7 @@ def cmd_e2e(a) -> int:
     console.rule("[bold]e2e summary")
     for n, s, w in results:
         console.print(f"{n:16} {s:24} {w}", markup=False)
+    console.print(coverage, markup=False)
     console.print(f"summary: {(root / 'e2e-summary.md').relative_to(ROOT)}")
     return 1 if failed else 0
 

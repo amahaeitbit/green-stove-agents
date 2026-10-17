@@ -93,3 +93,26 @@ def test_decision_trail_continue_stop_and_ping(tmp_path):
     assert inf.status == "INFEASIBLE" and [d.decision for d in inf.decisions] == ["stop", "ping_human"]
     loop = run(tmp_path / "c", FakeEnv(), scripted([{"sun": 4, "standard": 8, "peak": 13}] * 2))
     assert [d.decision for d in loop.decisions] == ["re-plan", "stop", "ping_human"] and "looping" in loop.decisions[1].reason
+
+
+class NoSimEnv(FakeEnv):
+    def simulate(self, plan, context, phase, actual=None):
+        from greenstove.env_protocol import ContractError
+        raise ContractError("UNSUPPORTED_PROFILE: test world")
+
+
+def test_world_that_cannot_simulate_stops_at_once_without_ping(tmp_path):
+    r = run(tmp_path, NoSimEnv(), scripted([{"sun": 4, "standard": 8, "peak": 13}] * 3))
+    assert r.status == "NO_VERIFIED_PLAN" and "cannot check this scenario" in r.reason
+    assert "UNSUPPORTED_PROFILE" in r.reason and len(r.attempts) == 1
+    assert [d.decision for d in r.decisions] == ["stop"]                     # a world limit, not a human question
+
+
+def test_c0_compatible_variant_has_its_own_hashes(monkeypatch):
+    from greenstove import cli
+    from greenstove.scenarios import scenario
+    monkeypatch.setenv("GREENSTOVE_WORLD", "abel")
+    full, c0 = scenario("dev-clear-full"), cli.context_for("dev-clear-full")
+    assert not any(c0.essential_load_kw) and any(full.essential_load_kw)
+    assert c0.config_hash != full.config_hash and c0.scenario_hash != full.scenario_hash
+    assert c0.scenario_id.endswith("-c0") and any("C0-compatible" in a for a in c0.assumptions)

@@ -6,6 +6,7 @@ and never relaxed. Status comes only from the verifier.
 """
 from __future__ import annotations
 
+import json
 import uuid
 from typing import Any
 
@@ -165,6 +166,16 @@ def run_agent_day(context: ScenarioContext, memory_mode: MemoryMode, requirement
                 att.evidence_ids.append(ev.run_id)
                 verdicts.append(v)
             rec.candidate_evaluations += 1
+            if not verdicts:                             # the world cannot check this scenario at all
+                err = ""
+                try:
+                    err = json.loads((evidence.run_dir(run_id) / f"unmodeled_{n}_{FORECAST_PHASES[0]}.json").read_text())["error"]
+                except (OSError, ValueError, KeyError):
+                    pass
+                att.feedback = ["WORLD_CANNOT_SIMULATE"]
+                rec.reason = f"the world cannot check this scenario ({err or 'no phase modeled'}); not a verified plan"
+                decide(n, "stop", "nothing can be verified on this world for this scenario; no further model calls")
+                break
             dod_fail = sorted({c for v in verdicts for c in dod.evaluate(v.metrics)}) if dod is not None else []
             att.passed = bool(verdicts) and not unmodeled and all(complete_pass(v) for v in verdicts) and not dod_fail
             att.feedback = sorted({f.code for v in verdicts for f in v.feedback_codes} | set(dod_fail))
@@ -208,7 +219,8 @@ def run_agent_day(context: ScenarioContext, memory_mode: MemoryMode, requirement
     except ModelError as exc:
         rec.status, rec.reason = "ERROR", f"model_error: {exc}"
         decide(n, "stop", "model or network error; nothing is dispatched (not reported as infeasible)")
-    if rec.status == "NO_VERIFIED_PLAN" and not rec.reason.startswith("checked conditions passed"):
+    if rec.status == "NO_VERIFIED_PLAN" and not rec.reason.startswith(("checked conditions passed",
+                                                                        "the world cannot check")):
         decide(n, "ping_human", "no verified plan on a day not proven infeasible; nothing is dispatched, "
                                 "the operator decides")
 
