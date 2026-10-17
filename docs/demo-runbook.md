@@ -12,6 +12,8 @@ one-minute video. Segment owners follow [submission.md](submission.md). Commands
 | Nemotron (exact id from `/v1/models`) | The model behind both agent roles | printed in the banner of every command |
 | Terminal demo (`rich`) | World, attempts and verdicts, reservations, demand and battery strips, Keeper decisions, brief, fresh-agent comparison, infeasibility proof | `python -m greenstove demo` |
 | Shared Brain tools | Entries, versions, expiry, conflict groups; audit log of admissions and rejections | `brain show`, `brain audit` |
+| Setup and readiness | Install, tests, mock smoke; PASS/WARN/FAIL table for key, spend flag, model id, world, brain, tests, git | `scripts/setup.sh`, `preflight` |
+| End-to-end runner | smoke → warm-up → freeze → held-out A/B/C → recorded demo in one folder | `e2e` |
 | Recorded transcripts | Every demo run is saved and can be replayed, labeled RECORDED | `demo --replay data/demo/<file>.txt` |
 | Results table *(Abel)* | Held-out comparison of all six conditions | `docs/results.md` from `eval` |
 
@@ -19,22 +21,28 @@ All commands run as `.venv/bin/python -m greenstove <command>` from the repo roo
 
 ## T−30 minutes: preflight
 
-1. `git pull` on the branch you will demo; `uv pip install --python .venv/bin/python -e ".[dev]"`.
-2. `.venv/bin/python -m pytest -q`: all green.
-3. Key and spend flag: `.venv/bin/python scripts/set_crusoe_key.py`, then set
-   `GREENSTOVE_LLM=crusoe` and `GREENSTOVE_LIVE_SPEND_OK=1` in `.env`.
-4. `python -m greenstove smoke --mode crusoe`: the Nemotron id is in the catalog, one
-   valid proposal comes back, and the call is recorded under `data/smoke/`.
-5. Optional: build the development brain with `python -m greenstove warmup --mode crusoe`
-   and inspect it with `brain show`. The demo itself starts from a fresh memory workspace,
-   so the observation the Keeper admits in the memory scene is exactly what the fresh agent
-   reads in the handoff scene. `demo --dev-brain` uses the warm-up brain instead.
+1. `git pull` on the branch you will demo, then `scripts/setup.sh` (install, tests, mock
+   smoke, readiness table).
+2. Live key: `.venv/bin/python scripts/set_crusoe_key.py --enable-live` (native dialog;
+   the key goes straight into the ignored `.env`).
+3. `python -m greenstove preflight --mode crusoe`: every row PASS or an understood WARN.
+   It checks the key (length only), the spend flag, the model id in Crusoe's catalog, which
+   world is loaded, the brain, the tests and git.
+4. `python -m greenstove smoke --mode crusoe`: one valid proposal, recorded under
+   `data/smoke/` with request id, tokens and latency.
+5. Optional: `python -m greenstove warmup --mode crusoe` and `brain show`. The demo itself
+   starts from a fresh memory workspace, so the observation the Keeper admits in the
+   memory scene is exactly what the fresh agent reads in the handoff scene.
+   `demo --dev-brain` uses the warm-up brain instead.
 6. Record a full fallback run: `python -m greenstove demo --mode crusoe`. Note the
    transcript path it prints (`data/demo/demo-crusoe-<time>.txt`).
 7. Check the banner says which world is running. If it says `stub-env (development
    stand-in, not Abel's simulator)`, Abel's world is not merged yet: say so on stage.
 8. Close other apps, set the terminal font large, widen the window to at least 120 columns,
    and keep a phone hotspot ready.
+
+The full pipeline (warm-up, freeze, held-out A/B/C, demo) is one command:
+`python -m greenstove e2e --mode crusoe`. See [end-to-end.md](end-to-end.md).
 
 ## Live sequence (3:00)
 

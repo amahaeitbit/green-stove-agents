@@ -18,6 +18,21 @@ Does curated shared experience reduce planning effort at comparable service, rel
 
 The baselines get the same current facts, household behavior, resource checks and action lattice. Evaluation memory is frozen. Count simulator evaluations, latency, cost, completed meals and violations, not just LLM calls. Report a negative result if reuse/search performs better.
 
+## Run it (agent layer, branch `agents-memory`)
+
+```bash
+scripts/setup.sh                                         # install, tests, mock smoke, readiness table
+.venv/bin/python -m greenstove demo --pause              # the demo scenes (mock unless live is on)
+.venv/bin/python scripts/set_crusoe_key.py --enable-live # key via native dialog, live mode on
+.venv/bin/python -m greenstove preflight --mode crusoe   # PASS/WARN/FAIL before going live
+.venv/bin/python -m greenstove e2e --mode crusoe         # smoke, warm-up, freeze, held-out A/B/C, demo
+```
+
+Until Abel's world is merged, commands run on a labeled development stand-in
+(`stub-env`), and mock mode is labeled MOCK; neither is evidence. See
+[docs/end-to-end.md](docs/end-to-end.md), [docs/demo-runbook.md](docs/demo-runbook.md) and
+[docs/agent-layer.md](docs/agent-layer.md).
+
 ## Two-person build
 
 | Owner | Responsibility |

@@ -75,6 +75,27 @@ DEMO_SCENARIOS = {
 }
 
 
+# Held-out days: factor combinations not used in development (seeds 1000+, clock days
+# 12-19, after development days 0-4). Agents never see their actual weather.
+HELDOUT_SCENARIOS = {
+    "ho-clear-low-battery": (1001, "clear", 0.3, 1.0, 1.0, 12),
+    "ho-partly-cloudy-low-battery": (1002, "partly_cloudy", 0.35, 1.0, 1.0, 13),
+    "ho-overcast-mid-battery": (1003, "overcast", 0.55, 1.0, 1.0, 14),
+    "ho-rainy-high-demand": (1004, "rainy_afternoon", 0.5, 1.15, 1.0, 15),
+    "ho-rainy-flexible": (1005, "rainy_afternoon", 0.4, 1.0, 1.4, 16),
+    "ho-clear-rigid": (1006, "clear", 0.6, 1.0, 0.6, 17),
+    "ho-overcast-high-battery": (1007, "overcast", 0.8, 1.0, 1.0, 18),
+    "ho-partly-cloudy-high-demand": (1008, "partly_cloudy", 0.5, 1.2, 1.0, 19),
+}
+
+
+def _spec(name: str):
+    spec = DEV_SCENARIOS.get(name) or DEMO_SCENARIOS.get(name) or HELDOUT_SCENARIOS.get(name)
+    if spec is None:
+        raise KeyError(f"unknown scenario {name!r}")
+    return spec
+
+
 def config_hash() -> str:
     """Hash of station, windows, lattice and household profiles (not seed/weather)."""
     cfg = {"station": STATION, "windows": [w.model_dump() for w in WINDOWS],
@@ -154,17 +175,13 @@ def make_actual(context: ScenarioContext, seed: int) -> ActualScenario:
 
 
 def scenario(name: str) -> ScenarioContext:
-    """Context for a named DEV_/DEMO_ scenario; scenario_id is the name."""
-    spec = DEV_SCENARIOS.get(name) or DEMO_SCENARIOS.get(name)
-    if spec is None:
-        raise KeyError(f"unknown scenario {name!r}")
-    seed, weather, frac, dscale, fscale, day = spec
+    """Context for a named DEV_/DEMO_/HELDOUT_ scenario; scenario_id is the name."""
+    seed, weather, frac, dscale, fscale, day = _spec(name)
     return make_context(seed, weather, frac, dscale, fscale, day, scenario_id=name)
 
 
 def actual_for(name: str) -> ActualScenario:
-    spec = DEV_SCENARIOS.get(name) or DEMO_SCENARIOS[name]
-    return make_actual(scenario(name), spec[0])
+    return make_actual(scenario(name), _spec(name)[0])
 
 
 def infeasible_context() -> ScenarioContext:

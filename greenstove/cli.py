@@ -9,6 +9,8 @@ import time
 from pathlib import Path
 
 from rich.console import Console
+from rich.markup import escape
+from rich.table import Table
 
 from greenstove import note_writer, pricing_agent
 from greenstove.brain.store import BrainStore
@@ -134,6 +136,102 @@ def cmd_brain(a) -> int:
     return 0
 
 
+def cmd_preflight(a) -> int:
+    """Readiness for an end-to-end or live demo run. Prints no secrets."""
+    import subprocess
+    from greenstove.agent_eval import git_commit
+    s = LLMSettings.from_env(a.mode)
+    rows: list[tuple[str, str, str]] = []
+    add = lambda name, status, note: rows.append((name, status, note))  # noqa: E731
+    env_file = ROOT / ".env"
+    add(".env file", "PASS" if env_file.exists() else "WARN", "present" if env_file.exists()
+        else "missing: cp .env.example .env (mock mode works without it)")
+    add("model mode", "PASS", f"{s.mode} ({s.model if s.mode == 'crusoe' else 'mock-rules'})")
+    if s.mode == "crusoe":
+        add("Crusoe key", "PASS" if len(s.api_key) >= 20 else "FAIL",
+            f"{len(s.api_key)} characters" if s.api_key else "missing: python scripts/set_crusoe_key.py")
+        add("live spend flag", "PASS" if s.live_spend_ok else "FAIL",
+            "GREENSTOVE_LIVE_SPEND_OK=1" if s.live_spend_ok else "set GREENSTOVE_LIVE_SPEND_OK=1 in .env")
+        if s.api_key and s.live_spend_ok:
+            try:
+                ids = [m.get("id") for m in LLMClient(s, MOCKS).list_models()]   # listing is not billed
+                add("model in catalog", "PASS" if s.model in ids else "FAIL",
+                    s.model if s.model in ids else f"not found; Nemotron ids: {[i for i in ids if 'emotron' in (i or '')]}")
+            except Exception as exc:  # noqa: BLE001 - report any transport/auth failure
+                add("model in catalog", "FAIL", f"{exc.__class__.__name__}: {str(exc)[:80]}")
+    env = load_environment()
+    add("world", "WARN" if "stub" in env.name else "PASS", env.name)
+    evidence, brain = stores()
+    add("development brain", "PASS" if brain.entries() else "WARN",
+        f"{len(brain.entries())} entries" if brain.entries() else "empty: run warmup (demo uses a fresh workspace anyway)")
+    tests = subprocess.run([sys.executable, "-m", "pytest", "-q"], cwd=ROOT, capture_output=True, text=True)
+    last = (tests.stdout.strip().splitlines() or ["no output"])[-1]
+    add("tests", "PASS" if tests.returncode == 0 else "FAIL", last)
+    git = subprocess.run(["git", "-C", str(ROOT), "status", "--porcelain"], capture_output=True, text=True).stdout
+    add("git", "PASS" if not git.strip() else "WARN", f"commit {git_commit()}" + ("" if not git.strip() else ", uncommitted changes"))
+    t = Table("check", "status", "detail")
+    for name, status, note in rows:
+        color = {"PASS": "green", "WARN": "yellow", "FAIL": "red"}[status]
+        t.add_row(name, f"[{color}]{status}[/]", escape(note))
+    console.print(t)
+    return 1 if any(st == "FAIL" for _, st, _ in rows) else 0
+
+
+def cmd_freeze(a) -> int:
+    from greenstove.agent_eval import freeze_memory
+    evidence, brain = stores()
+    out = Path(a.out) if a.out else data_dir() / f"freeze-{time.strftime('%Y%m%d-%H%M%S')}"
+    info = freeze_memory(evidence, brain, out)
+    console.print(f"frozen: brain {info['brain_snapshot'][:8]} ({info['brain_entries']} entries), "
+                  f"history {info['history_records']} records -> {out}")
+    return 0
+
+
+def cmd_eval_agents(a) -> int:
+    from greenstove import agent_eval, scenarios
+    llm, env = make_llm(a.mode), load_environment(prefer_stub=a.stub)
+    banner(llm, env.name)
+    names = list(scenarios.HELDOUT_SCENARIOS)[: a.days]
+    out = Path(a.out) if a.out else data_dir() / f"eval-agents-{time.strftime('%Y%m%d-%H%M%S')}"
+    out.mkdir(parents=True, exist_ok=True)
+    freeze_dir = Path(a.freeze)
+    info = json.loads((freeze_dir / "freeze.json").read_text())
+    runs = agent_eval.run_conditions(names, scenarios.scenario, scenarios.actual_for, scenarios.DEFAULT_REQUIREMENTS,
+                                     env=env, llm=llm, freeze_dir=freeze_dir, out=out,
+                                     log=lambda s: console.print(s, markup=False))
+    header = {"model": llm.s.public()["model"] if llm.s.mode == "crusoe" else "mock-rules (MOCK)",
+              "world": env.name, "commit": agent_eval.git_commit(), "brain_snapshot": info["brain_snapshot"],
+              "days": len(names)}
+    console.print(agent_eval.summarize(runs, out, header), markup=False)
+    frag = agent_eval.manifest_fragment(info, names, scenarios.DEFAULT_REQUIREMENTS, llm, env, scenarios.config_hash())
+    (out / "manifest-partner.json").write_text(json.dumps(frag, indent=2))
+    console.print(f"records: {out.relative_to(ROOT) if out.is_relative_to(ROOT) else out}")
+    return 0
+
+
+def cmd_e2e(a) -> int:
+    """smoke -> warmup -> freeze -> held-out A/B/C -> recorded demo, in one isolated data folder."""
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    root = data_dir() / f"e2e-{stamp}"
+    os.environ["GREENSTOVE_DATA_DIR"] = str(root.relative_to(ROOT))
+    mode = ["--mode", a.mode] if a.mode else []
+    steps = [("smoke", ["smoke"] + mode), ("warmup", ["warmup"] + mode),
+             ("freeze", ["freeze", "--out", str(root / "freeze")]),
+             ("eval-agents", ["eval-agents", "--freeze", str(root / "freeze"), "--out", str(root / "eval"),
+                              "--days", str(a.days)] + mode)]
+    if not a.skip_demo:
+        steps.append(("demo", ["demo"] + mode))
+    for name, argv in steps:
+        console.rule(f"[bold]e2e · {name}")
+        code = main(argv)
+        if code != 0:
+            console.print(f"[red]e2e stopped at {name} (exit {code})[/]; records so far in {root.relative_to(ROOT)}")
+            return code
+    console.rule("[bold green]e2e complete")
+    console.print(f"everything is under {root.relative_to(ROOT)}: smoke/, evidence/, brain/, freeze/, eval/, demo/")
+    return 0
+
+
 def cmd_demo(a) -> int:
     from greenstove import demo
     return demo.main(a)
@@ -160,6 +258,15 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--pause", action="store_true", help="wait for Enter between scenes")
     s.add_argument("--dev-brain", action="store_true", help="use the warm-up brain instead of a fresh demo workspace")
     s.set_defaults(fn=cmd_demo)
+    s = sub.add_parser("preflight"); s.add_argument("--mode", choices=["mock", "crusoe"]); s.set_defaults(fn=cmd_preflight)
+    s = sub.add_parser("freeze"); s.add_argument("--out"); s.set_defaults(fn=cmd_freeze)
+    s = sub.add_parser("eval-agents", help="conditions A/B/C on held-out days with frozen memory")
+    s.add_argument("--freeze", required=True); s.add_argument("--out"); s.add_argument("--days", type=int, default=8)
+    s.add_argument("--mode", choices=["mock", "crusoe"]); s.add_argument("--stub", action="store_true")
+    s.set_defaults(fn=cmd_eval_agents)
+    s = sub.add_parser("e2e", help="smoke, warmup, freeze, held-out A/B/C, recorded demo")
+    s.add_argument("--mode", choices=["mock", "crusoe"]); s.add_argument("--days", type=int, default=8)
+    s.add_argument("--skip-demo", action="store_true"); s.set_defaults(fn=cmd_e2e)
     a = p.parse_args(argv)
     try:
         return a.fn(a)
