@@ -50,7 +50,8 @@ from greenstove.admission_models import BatterySpec
 from greenstove.env_protocol import (Condition, ContractError, Coverage, Feedback, HouseholdRequest, Reservation,
                                      short_hash)
 
-ADMISSION_VERSION = "admission-glue-2"
+ADMISSION_VERSION = "admission-glue-1"              # re-offer off: exactly what Abel's independent verifier replays
+ADMISSION_VERSION_REOFFER = "admission-glue-2-reoffer"   # opt-in re-offer: not yet supported by his verifier
 MAX_REOFFERS = 4                                  # re-offers per request after energy DEFERs, then UNSERVED
 REOFFER_LABEL = "re-offer (opt-in, pending Abel's approval)"
 SCOPE = "admission-energy (Abel ledger; partner verdict glue, pending sign-off)"
@@ -169,10 +170,12 @@ class AdmissionWorld:
                                       "quote": new.locked_cost, "max_cost": req[r.request_id].max_cost,
                                       "required_kwh": 0.0, "available_kwh": d.available_storage_kwh,
                                       "label": REOFFER_LABEL})
-                else:                                        # no new authorized reservation: finalised, never retimed
+                elif self.reoffer:                           # no new authorized reservation: finalised, never retimed
                     outcomes[r.reservation_id] = "unserved"
                     if d.status == "DEFER":
                         rec["status"] = "DEFER→UNSERVED"
+                else:                                        # admission-glue-1 labels (DEFER = not started; never retimed)
+                    outcomes[r.reservation_id] = "deferred" if d.status == "DEFER" else "unserved"
             try:
                 state = admission.advance_interval(state, context, spec, pv_kw=pv[t]).state
             except ContractError as exc:                 # ledger assumption broken: an admitted session failed
@@ -194,10 +197,12 @@ class AdmissionWorld:
         sim_id = short_hash({"plan": plan.model_dump(mode="json"), "scenario": context.scenario_hash,
                              "config": context.config_hash, "phase": phase, "pv": pv,
                              "battery": spec.model_dump(), "req": self.requirements.model_dump(),
-                             "v": ADMISSION_VERSION, "reoffer": MAX_REOFFERS if self.reoffer else 0}, 16)
+                             **({"v": ADMISSION_VERSION_REOFFER, "reoffer": MAX_REOFFERS} if self.reoffer
+                                else {"v": ADMISSION_VERSION})}, 16)
         return Trace(simulation_id=sim_id, scenario_id=context.scenario_id, config_hash=context.config_hash,
                      scenario_hash=context.scenario_hash, phase=phase, proposal_id=plan.proposal_id,
-                     tariff_version=short_hash(sorted(plan.tariff.items()), 10), simulator_version=ADMISSION_VERSION,
+                     tariff_version=short_hash(sorted(plan.tariff.items()), 10),
+                     simulator_version=ADMISSION_VERSION_REOFFER if self.reoffer else ADMISSION_VERSION,
                      pv_kw=list(pv), cooking_kw=[round(c, 6) for c in cooking], demand_kw=demand, battery_kwh=battery,
                      overload_steps=[t for t in range(96) if demand[t] > context.inverter_kw + 1e-9],
                      unserved_essential_kwh=round(state.unserved_essential_kwh, 6),

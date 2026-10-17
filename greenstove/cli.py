@@ -151,9 +151,13 @@ def _battery_spec_dict(ctx) -> dict:
 def admission_variant(ctx):
     """Same scenario under Abel's admission policy: own station hash so memory never mixes worlds."""
     from greenstove.env_protocol import short_hash, with_scenario_hash
+    from greenstove.admission_verifier import configuration_hash
+    from greenstove.scenarios import DEFAULT_REQUIREMENTS
+    from greenstove.world_adapter import battery_spec
+    fingerprint = configuration_hash(ctx, battery_spec(ctx), DEFAULT_REQUIREMENTS)   # Abel's recipe, base context
     return with_scenario_hash(ctx.model_copy(update={
         "scenario_id": f"{ctx.scenario_id}-adm",
-        "config_hash": short_hash([ctx.config_hash, "abel-admission-policy", _battery_spec_dict(ctx)], 12),
+        "config_hash": fingerprint,
         "assumptions": list(ctx.assumptions) + ["evaluated under Abel's battery-backed admission policy"]}))
 
 

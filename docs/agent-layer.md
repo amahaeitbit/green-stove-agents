@@ -1,6 +1,7 @@
 # Agent layer: integration notes for Abel
 
-**Status 15:03 PT: admission integrated.** `GREENSTOVE_WORLD=abel-admission` runs your
+**Status 15:40 PT: your `ca42c1a` merged; `abel-admission` now uses your bridge and independent
+verifier (see docs/integration-response.md).** Earlier note: **15:03 PT admission integrated.** `GREENSTOVE_WORLD=abel-admission` runs your
 households, allocator (with the day's `max_shift_hours`) and battery-backed admission ledger
 through a full day for **every phase** (forecast_expected, forecast_downside, actual): at each
 booked start `admission.can_start(...)`, then `advance_interval(...)` with that phase's PV.

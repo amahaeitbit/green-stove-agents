@@ -96,8 +96,9 @@ def test_reoffer_is_opt_in_and_off_finalises_defer_as_unserved(monkeypatch):
     assert AdmissionWorld(reoffer=False).reoffer is False
     c, p, trace, v = _case(False)
     d = next(d for d in trace.extra["admission"] if d["request_id"] == "req-hh-02")
-    assert d["status"] == "DEFER→UNSERVED" and d["reason"] == "INSUFFICIENT_STORED_ENERGY"
-    assert trace.reservation_outcomes["p1:req-hh-02"] == "unserved"          # never retimed
+    # off = admission-glue-1, exactly what Abel's independent verifier replays: DEFER, not started, never retimed
+    assert d["status"] == "DEFER" and d["reason"] == "INSUFFICIENT_STORED_ENERGY"
+    assert trace.reservation_outcomes["p1:req-hh-02"] == "deferred" and trace.simulator_version == "admission-glue-1"
     assert not any(x["status"] == "REOFFER" for x in trace.extra["admission"]) and not trace.extra["reoffers"]
     assert not v.passed and v.metrics["reoffers"] == 0 and v.metrics["served_fraction"] == 0.625
     assert not next(x for x in v.conditions if x.name == "booked_sessions_admitted").passed
