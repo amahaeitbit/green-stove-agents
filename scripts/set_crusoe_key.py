@@ -1,7 +1,8 @@
 """Ask for the Crusoe API key in a native macOS dialog and write it into .env.
 
 The key never appears in the terminal, the chat or git. Prints only a status line.
-Usage: .venv/bin/python scripts/set_crusoe_key.py [--enable-live]
+Usage: .venv/bin/python scripts/set_crusoe_key.py [--enable-live] [--var YDC_API_KEY]
+  --var stores a different secret (for example the You.com key) with the same dialog.
   --enable-live also sets GREENSTOVE_LLM=crusoe and GREENSTOVE_LIVE_SPEND_OK=1 (billable calls).
 """
 import re
@@ -10,7 +11,10 @@ import sys
 from pathlib import Path
 
 ENV = Path(__file__).resolve().parents[1] / ".env"
-SCRIPT = ('display dialog "Paste your Crusoe API key (Intelligence Foundry → API keys)" '
+VAR = sys.argv[sys.argv.index("--var") + 1] if "--var" in sys.argv else "CRUSOE_API_KEY"
+PROMPT = {"CRUSOE_API_KEY": "Paste your Crusoe API key (Intelligence Foundry → API keys)",
+          "YDC_API_KEY": "Paste your You.com API key (you.com/platform/api-keys)"}.get(VAR, f"Paste {VAR}")
+SCRIPT = (f'display dialog "{PROMPT}" '
           'default answer "" with hidden answer with title "Green-Stove Agents" buttons {"Cancel","Save"} '
           'default button "Save"')
 
@@ -36,12 +40,12 @@ def main() -> int:
     if not ENV.exists():
         example = ENV.with_name(".env.example")
         ENV.write_text(example.read_text() if example.exists() else "")
-    text = set_var(ENV.read_text(), "CRUSOE_API_KEY", key)
+    text = set_var(ENV.read_text(), VAR, key)
     live = "--enable-live" in sys.argv
     if live:
         text = set_var(set_var(text, "GREENSTOVE_LLM", "crusoe"), "GREENSTOVE_LIVE_SPEND_OK", "1")
     ENV.write_text(text)
-    print(f"saved CRUSOE_API_KEY ({len(key)} characters) to .env"
+    print(f"saved {VAR} ({len(key)} characters) to .env"
           + ("; live mode on (GREENSTOVE_LLM=crusoe, GREENSTOVE_LIVE_SPEND_OK=1)" if live
              else "; rerun with --enable-live to turn on billable calls"))
     return 0

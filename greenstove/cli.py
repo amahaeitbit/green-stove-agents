@@ -19,7 +19,13 @@ from greenstove.evidence import EvidenceStore
 from greenstove.llm import LLMClient, LLMSettings, ModelError, ROOT
 
 console = Console()
-MOCKS = {"pricing": pricing_agent.mock_pricing, "note_writer": note_writer.mock_note_writer}
+def _mock_forecast(payload):
+    from greenstove.forecast.pipeline import mock_extractor
+    return mock_extractor(payload)
+
+
+MOCKS = {"pricing": pricing_agent.mock_pricing, "note_writer": note_writer.mock_note_writer,
+         "forecast_extractor": _mock_forecast}
 
 
 def data_dir() -> Path:
@@ -111,6 +117,12 @@ def cmd_plan(a) -> int:
         console.print(f"[red]unknown scenario[/] {a.scenario}; choose from {sorted(named) + ['infeasible']}")
         return 1
     ctx = context_for(a.scenario)
+    if getattr(a, "forecast", None):
+        from greenstove.forecast.pipeline import context_from_forecast, load
+        rec = load(Path(a.forecast))
+        ctx = context_from_forecast(rec, ctx)
+        console.print(f"forecast: {rec.place} {rec.date} · {rec.weather_class} · PV {rec.pv_kwh} kWh "
+                      f"(downside {rec.downside_pv_kwh}) · search {rec.search_mode} · {rec.status}", markup=False)
     evidence, brain = stores()
     actual = make_actual(ctx, seed=ctx.day + 7) if a.execute else None
     run = supervisor.run_agent_day(ctx, a.brain, DEFAULT_REQUIREMENTS, env=env, llm=llm,
@@ -162,6 +174,27 @@ def cmd_brain(a) -> int:
     return 0
 
 
+def cmd_forecast(a) -> int:
+    """You.com search -> Nemotron extraction -> verified quote -> PV profile for the station."""
+    from datetime import date as _date, timedelta
+    from greenstove.demo import hourly, spark
+    from greenstove.forecast import pipeline
+    search_mode = "live" if a.mode in ("live", "crusoe") else "mock"
+    llm = make_llm(a.mode)
+    console.print(f"forecast: You.com search [bold]{search_mode}[/] · extraction model "
+                  f"{'MOCK (rule-based)' if llm.s.mode == 'mock' else 'LIVE ' + llm.s.model}")
+    day = _date.fromisoformat(a.date) if a.date else _date.today() + timedelta(days=1)
+    rec = pipeline.build_forecast(a.place, a.lat, a.lon, day, tz_hours=a.tz, kwp=a.kwp, search_mode=search_mode, llm=llm)
+    for line in pipeline.summary_lines(rec):
+        console.print(line, markup=False)
+    top = max(max(rec.forecast_pv_kw), 0.1)
+    console.print(f"PV forecast |{spark(hourly(rec.forecast_pv_kw), top)}|  downside |"
+                  f"{spark(hourly(rec.downside_pv_kw), top)}|  (00-24h)", markup=False)
+    path = pipeline.save(rec, data_dir() / "forecast")
+    console.print(f"saved: {path.relative_to(ROOT)}  ->  gsa decide --forecast {path.relative_to(ROOT)}")
+    return 0 if rec.status == "VERIFIED" else 3
+
+
 def cmd_preflight(a) -> int:
     """Readiness for an end-to-end or live demo run. Prints no secrets."""
     import subprocess
@@ -185,6 +218,9 @@ def cmd_preflight(a) -> int:
                     s.model if s.model in ids else f"not found; Nemotron ids: {[i for i in ids if 'emotron' in (i or '')]}")
             except Exception as exc:  # noqa: BLE001 - report any transport/auth failure
                 add("model in catalog", "FAIL", f"{exc.__class__.__name__}: {str(exc)[:80]}")
+    ydc = os.environ.get("YDC_API_KEY", "").strip()
+    add("You.com key (forecast)", "PASS" if len(ydc) >= 20 else "WARN",
+        f"{len(ydc)} characters" if ydc else "missing: scripts/set_crusoe_key.py --var YDC_API_KEY (mock forecast works)")
     env = load_environment()
     add("world", "WARN" if "stub" in env.name else "PASS", env.name)
     evidence, brain = stores()
@@ -271,7 +307,8 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--scenario", required=True); s.add_argument("--brain", default="curated",
                                                                 choices=["off", "history", "curated"])
     s.add_argument("--execute", action="store_true"); s.add_argument("--mode", choices=["mock", "live", "crusoe"])
-    s.add_argument("--stub", action="store_true"); s.set_defaults(fn=cmd_plan)
+    s.add_argument("--stub", action="store_true"); s.add_argument("--forecast", help="saved forecast record (gsa forecast)")
+    s.set_defaults(fn=cmd_plan)
     s = sub.add_parser("warmup"); s.add_argument("--mode", choices=["mock", "live", "crusoe"])
     s.add_argument("--stub", action="store_true"); s.set_defaults(fn=cmd_warmup)
     s = sub.add_parser("brain"); s.add_argument("action", choices=["show", "audit", "freeze"], nargs="?", default="show")
@@ -288,12 +325,17 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--condition", choices=list(CONDITIONS), default="C")
     s.add_argument("--scenario", default="demo-handoff-overcast")
     s.add_argument("--mode", choices=["mock", "live", "crusoe"]); s.add_argument("--stub", action="store_true")
-    s.set_defaults(fn=cmd_run)
+    s.add_argument("--forecast", help="saved forecast record (gsa forecast)"); s.set_defaults(fn=cmd_run)
     s = sub.add_parser("decide", help="run one day and print the operator decision record")
     s.add_argument("--condition", choices=list(CONDITIONS), default="C")
     s.add_argument("--scenario", default="demo-handoff-overcast")
     s.add_argument("--mode", choices=["mock", "live", "crusoe"]); s.add_argument("--stub", action="store_true")
-    s.set_defaults(fn=cmd_decide)
+    s.add_argument("--forecast", help="saved forecast record (gsa forecast)"); s.set_defaults(fn=cmd_decide)
+    s = sub.add_parser("forecast", help="weather forecast (You.com + Nemotron) -> solar generation profile")
+    s.add_argument("--place", default="Asmara, Eritrea"); s.add_argument("--lat", type=float, default=15.3229)
+    s.add_argument("--lon", type=float, default=38.9251); s.add_argument("--tz", type=float, default=3.0)
+    s.add_argument("--date", help="YYYY-MM-DD (default tomorrow)"); s.add_argument("--kwp", type=float, default=3.0)
+    s.add_argument("--mode", choices=["mock", "live", "crusoe"]); s.set_defaults(fn=cmd_forecast)
     s = sub.add_parser("preflight"); s.add_argument("--mode", choices=["mock", "live", "crusoe"]); s.set_defaults(fn=cmd_preflight)
     s = sub.add_parser("freeze"); s.add_argument("--out"); s.set_defaults(fn=cmd_freeze)
     s = sub.add_parser("eval-agents", help="conditions A/B/C on held-out days with frozen memory")

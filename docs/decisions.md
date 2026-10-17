@@ -51,6 +51,7 @@ alternatives, cost, and what the model was not allowed to decide.
 | `briefs.py`: deterministic match on weather class, SOC bucket, demand, flexibility, config hash; 600-token cap; logs ids/versions; A [] · B raw rows · C approved obs | Same; distance weights are constants in `briefs.py` | Matched |
 | Crusoe: same model across A/B/C | One model id from `.env`, recorded in every call and in the manifest | Matched |
 | Stretch: NemoClaw / OpenShell sandbox | Not built | Only after C3 passes, per PLAN.md |
+| You.com (PLAN.md: Abel, stretch) | Built by the partner at the user's request: `gsa forecast` (You.com Web Search → Nemotron extraction → verified quote → PV profile) and `--forecast` on `plan`/`run`/`decide` | Forecast records are inputs to a day, saved and frozen; evaluation never runs a live search; Abel to review |
 
 ## Extra decisions not in the diagram
 
@@ -73,3 +74,22 @@ alternatives, cost, and what the model was not allowed to decide.
    differ.
 4. Whether a `Plan` can carry `INVALID_TARIFF`; today the Pricing Agent validates before
    allocation, so the allocator never sees an invalid tariff.
+
+## Weather forecast and solar generation (You.com)
+
+```
+gsa forecast --place "Asmara, Eritrea" --lat 15.3229 --lon 38.9251 --date 2026-10-18 --mode live
+  You.com Web Search (POST ydc-index.io/v1/search, highlights) for the place and date
+  → Nemotron on Crusoe extracts cloud cover %, rain chance %, condition, source_url, verbatim quote
+  → code keeps a value only if the quote is in that source's retrieved text and every number is in the quote
+  → PV profile: NOAA solar position, Haurwitz clear sky, Kasten-Czeplak cloud factor, 3 kWp × 0.8
+  → downside: cloud +0.25 (rain ≥ 50%: lighter morning, heavier afternoon)
+  → data/forecast/<place>-<date>-<mode>.json  →  gsa decide --forecast <file>
+```
+
+- You.com is a search service, not a weather provider: the record keeps the source url,
+  page age, query and quote, and says `NO_VERIFIED_FORECAST` (conservative cloud 0.6) when
+  nothing passes the check. Mock mode uses a fixture at `example.invalid`, labeled.
+- A forecast supports an input assumption; it does not calibrate or validate the simulator.
+- Only the place and date go to web search; no household data.
+- Default site is a placeholder (Asmara); set the pilot's real coordinates with `--lat/--lon`.

@@ -74,6 +74,14 @@ Per-run budgets in `.env` (`GREENSTOVE_MAX_CALLS_PER_RUN`, `GREENSTOVE_MAX_TOKEN
 stop a runaway loop with an `ERROR` status, never a fake pass. Without a payment method
 Crusoe allows 30 requests per minute per model; the client backs off on 429 and 503.
 
+## Optional: real forecast for the station
+
+`gsa forecast --mode live --place "<site>" --lat <lat> --lon <lon> --date <YYYY-MM-DD>` uses
+You.com search and Nemotron extraction to produce a verified forecast record and PV profile,
+and `gsa decide --forecast <file>` plans that day with it. Needs `YDC_API_KEY`
+(`scripts/set_crusoe_key.py --var YDC_API_KEY`). Held-out evaluation keeps using frozen
+scenarios; forecasts are never fetched live during evaluation.
+
 ## What each run leaves behind
 
 | Folder | Contents |

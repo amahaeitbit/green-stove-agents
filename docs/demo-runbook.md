@@ -13,6 +13,7 @@ one-minute video. Segment owners follow [submission.md](submission.md). Commands
 | Terminal demo (`rich`) | World, attempts and verdicts, reservations, demand and battery strips, Keeper decisions, brief, fresh-agent comparison, infeasibility proof | `python -m greenstove demo` |
 | Shared Brain tools | Entries, versions, expiry, conflict groups; audit log of admissions and rejections | `brain show`, `brain audit` |
 | Setup and readiness | Install, tests, mock smoke; PASS/WARN/FAIL table for key, spend flag, model id, world, brain, tests, git | `scripts/setup.sh`, `preflight` |
+| Weather + solar forecast (You.com + Nemotron) | Cited forecast for the site and date, verified quote, PV and downside profiles in kWh | `gsa forecast --mode live`, then `gsa decide --forecast <file>` |
 | Operator decision record | Today's tariff and why, memory relied on, both checks, bookings, who must confirm, rejected alternatives, cost | `gsa decide --scenario demo-handoff-overcast --condition C` |
 | End-to-end runner | smoke → warm-up → freeze → held-out A/B/C → recorded demo in one folder | `e2e` |
 | Recorded transcripts | Every demo run is saved and can be replayed, labeled RECORDED | `demo --replay data/demo/<file>.txt` |
