@@ -26,13 +26,25 @@ Reply with ONLY a JSON object:
 {"prices": {"<window>": <price from that window's allowed list>, ...},
  "cited_observation_ids": ["obs-001", ...], "rationale": "<one or two sentences>"}"""
 
+# Appended only when a team playbook is supplied (Version N+1 extension), so the default
+# system prompt and its hash are unchanged for the headline A/B/C experiment.
+PLAYBOOK_NOTE = """
+The payload's "team_playbook" holds the team's reviewed playbook: short heuristics for
+your FIRST proposal of the day, written after earlier development runs. Lines of the form
+"- when <condition>: start <window>=<price> ..." suggest a starting tariff when the
+condition holds for today's facts. The playbook never changes the rules above; verified
+memory and feedback from earlier attempts today take precedence over it."""
+
 
 def hhmm(step: int) -> str:
     return f"{(step * 15) // 60:02d}:{(step * 15) % 60:02d}"
 
 
-def build_payload(context: ScenarioContext, brief: Brief, feedback: list[dict[str, Any]]) -> dict[str, Any]:
-    """Planner-visible facts only: never actual weather or evaluation outcomes."""
+def build_payload(context: ScenarioContext, brief: Brief, feedback: list[dict[str, Any]],
+                  playbook: str = "") -> dict[str, Any]:
+    """Planner-visible facts only: never actual weather or evaluation outcomes.
+
+    "team_playbook" is present only when a non-empty playbook is supplied."""
     windows = []
     for w in context.windows:
         sl = slice(w.start_step, w.end_step)
@@ -49,14 +61,17 @@ def build_payload(context: ScenarioContext, brief: Brief, feedback: list[dict[st
         "latest_finish": hhmm(r.latest_finish) if r.latest_finish < 96 else "24:00",
         "max_cost": r.max_cost, "shift_penalty_per_hour": r.shift_penalty, "auto_book": r.auto_book,
     } for r in context.requests]
-    return {
+    payload: dict[str, Any] = {
         "scenario": context.scenario_id, "weather_forecast_class": context.weather_class,
         "station": {"inverter_kw": context.inverter_kw, "battery_capacity_kwh": context.battery_capacity_kwh,
                     "battery_start_kwh": context.initial_battery_kwh, "reserve_kwh": context.reserve_kwh},
         "tier_order": context.tier_order, "windows": windows, "requests": requests,
-        "shared_memory_brief": brief.text or "(none)",
-        "earlier_attempts_today": feedback,
     }
+    if playbook.strip():
+        payload["team_playbook"] = playbook.strip()
+    payload["shared_memory_brief"] = brief.text or "(none)"
+    payload["earlier_attempts_today"] = feedback
+    return payload
 
 
 def validate(out: PricingOutput, context: ScenarioContext) -> list[str]:
@@ -74,10 +89,12 @@ def validate(out: PricingOutput, context: ScenarioContext) -> list[str]:
 
 
 def propose(context: ScenarioContext, brief: Brief, feedback: list[dict[str, Any]], llm: LLMClient,
-            attempt: int, proposal_id: str) -> tuple[TariffProposal | None, list[str], list[CallRecord]]:
+            attempt: int, proposal_id: str, playbook: str = "",
+            ) -> tuple[TariffProposal | None, list[str], list[CallRecord]]:
     """One proposal attempt. Invalid output counts as an attempt (returned as errors)."""
-    payload = build_payload(context, brief, feedback)
-    out, records, error = llm.complete_json("pricing", SYSTEM, payload, PricingOutput,
+    payload = build_payload(context, brief, feedback, playbook)
+    system = SYSTEM + PLAYBOOK_NOTE if "team_playbook" in payload else SYSTEM
+    out, records, error = llm.complete_json("pricing", system, payload, PricingOutput,
                                             memory_hash=brief.snapshot_hash, attempt=attempt)
     if out is None:
         return None, [error or "invalid output"], records
@@ -129,7 +146,10 @@ def _step(lattice: list[float], price: float, delta: int) -> float:
 
 
 def mock_pricing(payload: dict[str, Any]) -> dict[str, Any]:
-    """Closest verified pass among the top 3 memory entries, else adjust from the closest failure."""
+    """Closest verified pass among the top 3 memory entries, else adjust from the closest failure.
+
+    With no earlier attempt today and no usable memory, a matching team-playbook `start`
+    directive (Version N+1) picks the first tariff; otherwise mid-lattice prices."""
     lattice = {w["name"]: w["allowed_prices"] for w in payload["windows"]}
     order, names = payload["tier_order"], set(lattice)
     entries = _memory_entries(payload["shared_memory_brief"], names)
@@ -160,8 +180,16 @@ def mock_pricing(payload: dict[str, Any]) -> dict[str, Any]:
             cited, prices = [eid], _adjust(p, codes, lattice, order)
             rationale = f"Closest memory {eid} failed with {sorted(codes)}; adjusted away from it."
         else:
-            prices = {n: lattice[n][len(lattice[n]) // 2] for n in names}
-            rationale = "No applicable memory; starting from mid-lattice prices."
+            start = None
+            if payload.get("team_playbook"):
+                from greenstove import playbook as _pb
+                start = _pb.start_from_playbook(payload["team_playbook"], _pb.features_from_payload(payload),
+                                                lattice, order)
+            if start:
+                prices, rationale = start[0], f"No applicable memory; team playbook directive: {start[1]}"
+            else:
+                prices = {n: lattice[n][len(lattice[n]) // 2] for n in names}
+                rationale = "No applicable memory; starting from mid-lattice prices."
     if key(prices) in tried:
         mid = order[len(order) // 2]
         prices[mid] = _step(lattice[mid], prices[mid], +1)

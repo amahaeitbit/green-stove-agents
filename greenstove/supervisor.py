@@ -70,7 +70,7 @@ def run_agent_day(context: ScenarioContext, memory_mode: MemoryMode, requirement
                   env: Environment, llm: LLMClient, evidence: EvidenceStore, brain: BrainStore | None = None,
                   history: list[EvidenceRecord] | None = None, phase: RunPhase = "development",
                   actual: ActualScenario | None = None, max_attempts: int = 3, write_notes: bool | None = None,
-                  brief_budget: int = 600, keeper_ttl_days: int = 30) -> RunRecord:
+                  brief_budget: int = 600, keeper_ttl_days: int = 30, playbook: str = "") -> RunRecord:
     run_id = f"run-{context.scenario_id}-{memory_mode}-{uuid.uuid4().hex[:6]}"
     llm.reset_budget()
     sit = situation_of(context)
@@ -97,7 +97,7 @@ def run_agent_day(context: ScenarioContext, memory_mode: MemoryMode, requirement
     try:
         for n in range(1, max_attempts + 1):
             pid = f"{run_id}-p{n}"
-            proposal, errors, _ = pricing_agent.propose(context, brief, feedback, llm, n, pid)
+            proposal, errors, _ = pricing_agent.propose(context, brief, feedback, llm, n, pid, playbook=playbook)
             att = AttemptRecord(n=n, proposal=proposal, validation_errors=errors)
             rec.attempts.append(att)
             if proposal is None:
