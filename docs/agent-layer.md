@@ -55,4 +55,4 @@ python -m greenstove brain show|audit|freeze
 python -m greenstove demo [--scene ...] [--pause] [--replay file]
 ```
 
-Demo order, timing and fallbacks: [demo-runbook.md](demo-runbook.md).
+Demo order, timing and fallbacks: [demo-runbook.md](demo-runbook.md). Diagram reconciliation and open questions for you: [decisions.md](decisions.md).

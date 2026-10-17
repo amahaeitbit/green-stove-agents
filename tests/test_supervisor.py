@@ -116,3 +116,16 @@ def test_evaluation_quarantines_notes(stores):
     n_before = len(brain.entries())
     r = run(ctx(), "curated", stores, phase="evaluation", write_notes=True)
     assert r.notes == [] and len(brain.entries()) == n_before and r.quarantined_notes
+
+
+def test_decision_record_and_run_folder(stores):
+    from greenstove.decision import brief_lines, render_decision
+    ev, _ = stores
+    c = ctx()
+    r = run(c, "off", stores)
+    files = {p.name for p in ev.run_dir(r.agent_run_id).iterdir()}
+    assert {"requests.json", "tariff_1.json", "reservations_1.json", "verdict_1_forecast_expected.json",
+            "status.json", "run.json"} <= files
+    text = render_decision(c, r, FakeEnv(), REQ, brief_lines(r.brief.text))
+    assert "Status: PLAN_VERIFIED" in text and "Today's tariff" in text and "Alternatives rejected" in text
+    assert "Not decided by the model" in text

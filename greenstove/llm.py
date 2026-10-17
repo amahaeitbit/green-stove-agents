@@ -50,8 +50,9 @@ class LLMSettings:
     def from_env(cls, mode: str | None = None) -> "LLMSettings":
         load_dotenv(ROOT / ".env")
         env = os.environ.get
+        mode = mode or env("GREENSTOVE_LLM", "mock")
         return cls(
-            mode=mode or env("GREENSTOVE_LLM", "mock"),
+            mode="crusoe" if mode == "live" else mode,
             model=env("GREENSTOVE_MODEL", cls.model),
             base_url=env("CRUSOE_BASE_URL", cls.base_url).rstrip("/"),
             temperature=float(env("GREENSTOVE_TEMPERATURE", "0.2")),
@@ -94,10 +95,12 @@ def extract_json(text: str) -> dict[str, Any]:
 
 
 class LLMClient:
-    def __init__(self, settings: LLMSettings, mock_handlers: dict[str, MockHandler] | None = None):
+    def __init__(self, settings: LLMSettings, mock_handlers: dict[str, MockHandler] | None = None,
+                 usage_path: Path | None = None):
         self.s = settings
         self.mock_handlers = mock_handlers or {}
         self.calls: list[CallRecord] = []
+        self.usage_path = usage_path                 # append-only usage.jsonl: no keys, prompt hash only
         if settings.mode == "crusoe":
             if not settings.api_key:
                 raise ModelError("CRUSOE_API_KEY is not set (run scripts/set_crusoe_key.py)")
@@ -139,10 +142,12 @@ class LLMClient:
             try:
                 obj = schema.model_validate(extract_json(text))
                 rec.outcome = "repaired" if repair else "ok"
+                self._log(rec)
                 return obj, records, None
             except (ValueError, ValidationError) as exc:
                 error = f"invalid output: {str(exc)[:300]}"
                 rec.outcome, rec.error = "invalid", error
+                self._log(rec)
                 messages = messages + [
                     {"role": "assistant", "content": (text or "")[:2000]},
                     {"role": "user", "content": "Your reply was not valid for the schema. Error: "
@@ -161,11 +166,19 @@ class LLMClient:
     def _headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self.s.api_key}", "Content-Type": "application/json"}
 
-    def _record(self, role, messages, memory_hash, attempt, outcome, **kw) -> CallRecord:
+    def _log(self, rec: CallRecord) -> None:
+        if self.usage_path is not None:
+            self.usage_path.parent.mkdir(parents=True, exist_ok=True)
+            with self.usage_path.open("a") as f:
+                f.write(rec.model_dump_json() + "\n")
+
+    def _record(self, role, messages, memory_hash, attempt, outcome, defer: bool = False, **kw) -> CallRecord:
         rec = CallRecord(role=role, llm_mode=self.s.mode, model=self.s.public()["model"],
                          prompt_hash=stable_hash(messages), memory_hash=memory_hash,
                          settings=self.s.public(), attempt=attempt, outcome=outcome, **kw)
         self.calls.append(rec)
+        if not defer:
+            self._log(rec)
         return rec
 
     def _send(self, role, messages, payload, memory_hash, attempt) -> tuple[str, CallRecord]:
@@ -176,7 +189,7 @@ class LLMClient:
                 raise ModelError(f"no mock handler for role {role!r}")
             text = json.dumps(handler(payload))
             prompt_chars = sum(len(m["content"]) for m in messages)
-            return text, self._record(role, messages, memory_hash, attempt, "ok",
+            return text, self._record(role, messages, memory_hash, attempt, "ok", defer=True,
                                       prompt_tokens=prompt_chars // 4, completion_tokens=len(text) // 4,
                                       latency_ms=int((time.monotonic() - t0) * 1000))
         body = {"model": self.s.model, "messages": messages, "temperature": self.s.temperature,
@@ -207,7 +220,7 @@ class LLMClient:
         msg = choice.get("message") or {}
         text = msg.get("content") or ""
         usage = data.get("usage") or {}
-        rec = self._record(role, messages, memory_hash, attempt, "ok", request_id=data.get("id"),
+        rec = self._record(role, messages, memory_hash, attempt, "ok", defer=True, request_id=data.get("id"),
                            prompt_tokens=int(usage.get("prompt_tokens", 0)),
                            completion_tokens=int(usage.get("completion_tokens", 0)), latency_ms=latency)
         if not text and choice.get("finish_reason") == "length":

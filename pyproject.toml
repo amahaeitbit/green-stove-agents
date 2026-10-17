@@ -10,6 +10,9 @@ dependencies = [
   "rich>=13.7",
 ]
 
+[project.scripts]
+gsa = "greenstove.cli:main"
+
 [project.optional-dependencies]
 dev = ["pytest>=8"]
 

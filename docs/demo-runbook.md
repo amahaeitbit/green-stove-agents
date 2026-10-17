@@ -13,11 +13,13 @@ one-minute video. Segment owners follow [submission.md](submission.md). Commands
 | Terminal demo (`rich`) | World, attempts and verdicts, reservations, demand and battery strips, Keeper decisions, brief, fresh-agent comparison, infeasibility proof | `python -m greenstove demo` |
 | Shared Brain tools | Entries, versions, expiry, conflict groups; audit log of admissions and rejections | `brain show`, `brain audit` |
 | Setup and readiness | Install, tests, mock smoke; PASS/WARN/FAIL table for key, spend flag, model id, world, brain, tests, git | `scripts/setup.sh`, `preflight` |
+| Operator decision record | Today's tariff and why, memory relied on, both checks, bookings, who must confirm, rejected alternatives, cost | `gsa decide --scenario demo-handoff-overcast --condition C` |
 | End-to-end runner | smoke → warm-up → freeze → held-out A/B/C → recorded demo in one folder | `e2e` |
 | Recorded transcripts | Every demo run is saved and can be replayed, labeled RECORDED | `demo --replay data/demo/<file>.txt` |
 | Results table *(Abel)* | Held-out comparison of all six conditions | `docs/results.md` from `eval` |
 
-All commands run as `.venv/bin/python -m greenstove <command>` from the repo root.
+All commands run as `.venv/bin/gsa <command>` (or `.venv/bin/python -m greenstove <command>`) from the repo root.
+Q&A prop: `gsa decide` shows the full decision an operator would get for one day.
 
 ## T−30 minutes: preflight
 

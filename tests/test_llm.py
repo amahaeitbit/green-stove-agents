@@ -53,3 +53,13 @@ def test_live_mode_needs_key_and_explicit_spend_flag():
         LLMClient(LLMSettings(mode="crusoe", api_key=""))
     with pytest.raises(ModelError):
         LLMClient(LLMSettings(mode="crusoe", api_key="k" * 30, live_spend_ok=False))
+
+
+def test_usage_log_has_final_outcomes_and_no_key(tmp_path):
+    replies = iter([{"prices": "bad"}, {"prices": {"sun": 4}}])
+    llm = LLMClient(LLMSettings(mode="mock", api_key="secret-should-not-appear"), {"pricing": lambda p: next(replies)},
+                    usage_path=tmp_path / "usage.jsonl")
+    llm.complete_json("pricing", "sys", {}, PricingOutput)
+    lines = (tmp_path / "usage.jsonl").read_text().splitlines()
+    assert ['"invalid"' in lines[0], '"repaired"' in lines[1]] == [True, True]
+    assert "secret-should-not-appear" not in "".join(lines)

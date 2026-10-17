@@ -89,6 +89,7 @@ def run_agent_day(context: ScenarioContext, memory_mode: MemoryMode, requirement
         return rec
 
     requests = env.household_requests(context)
+    evidence.write(run_id, "requests", requests)
     feedback: list[dict[str, Any]] = []
     seen: set[str] = set()
     run_records: list[EvidenceRecord] = []
@@ -109,9 +110,12 @@ def run_agent_day(context: ScenarioContext, memory_mode: MemoryMode, requirement
                 break
             seen.add(h)
             plan = env.allocate(requests, proposal.prices, context, pid)
+            evidence.write(run_id, f"tariff_{n}", proposal)
+            evidence.write(run_id, f"reservations_{n}", plan)
             verdicts = []
             for ph in FORECAST_PHASES:
                 v = env.verify(env.simulate(plan, context, ph), requirements, context, plan)
+                evidence.write(run_id, f"verdict_{n}_{ph}", v)
                 rec.simulator_runs += 1
                 ev = _evidence(v, run_id, context, sit, proposal.prices, pid)
                 evidence.put(ev)
@@ -134,6 +138,7 @@ def run_agent_day(context: ScenarioContext, memory_mode: MemoryMode, requirement
 
     if selected_plan is not None and actual is not None:
         v = env.verify(env.simulate(selected_plan, context, "actual", actual), requirements, context, selected_plan)
+        evidence.write(run_id, "verdict_actual", v)
         rec.simulator_runs += 1
         ev = _evidence(v, run_id, context, sit, rec.selected_tariff or {}, rec.selected_proposal_id or "")
         evidence.put(ev)

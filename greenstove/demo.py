@@ -96,6 +96,12 @@ def main(a) -> int:
 
     out_dir = cli.data_dir() / "demo"
     if a.replay:
+        if a.replay == "latest":
+            found = sorted(out_dir.glob("demo-*.txt"), key=lambda q: q.stat().st_mtime)
+            if not found:
+                Console().print("no recorded demo yet; run `demo` first")
+                return 1
+            a.replay = str(found[-1])
         text = Path(a.replay).read_text()
         Console().print(Panel(f"RECORDED demo transcript: {a.replay}", style="bold magenta"))
         print(text)

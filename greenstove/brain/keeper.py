@@ -34,6 +34,24 @@ _ID_TOKEN = re.compile(r"\b[A-Za-z][A-Za-z0-9]*(?:[-_][A-Za-z0-9.]+)+")
 _NUMBER = re.compile(r"(?<![A-Za-z0-9_.])(\d+(?:\.\d+)?)(%?)")
 
 
+# Stage order from the team diagram; a rejection reports the first failing stage only.
+STAGE_OF = {"unknown_evidence": "evidence_unknown", "expired_evidence": "evidence_expired",
+            "future_evidence": "evidence_expired", "config_mismatch": "evidence_expired",
+            "claimed_tariff": "result_mismatch", "claimed_phase": "result_mismatch",
+            "claimed_result": "result_mismatch", "unsupported_number": "result_mismatch",
+            "outcome_contradiction": "result_mismatch", "phase_contradiction": "result_mismatch",
+            "incomplete_forecast_evidence": "result_mismatch", "mixed_evidence": "scope",
+            "tag_out_of_scope": "scope", "constraint_edit": "constraint_edit"}
+ORDER = ("evidence_unknown", "evidence_expired", "result_mismatch", "scope", "constraint_edit")
+
+
+def first_stage(reasons: list[str]) -> tuple[str, list[str]]:
+    """(code, details) of the earliest failing stage."""
+    staged = [(ORDER.index(STAGE_OF.get(r.split(":")[0], "scope")), r) for r in reasons]
+    first = min(i for i, _ in staged)
+    return ORDER[first], [r for i, r in staged if i == first]
+
+
 @dataclass(frozen=True)
 class KeeperConfig:
     config_hash: str
@@ -129,6 +147,12 @@ def _supported(raw: str, percent: bool, values: list[float]) -> bool:
 def _scope_problems(proposal: ObservationProposal, facts: dict, known_ids: set[str],
                     tags: list[str]) -> list[str]:
     reasons = []
+    if proposal.claimed_tariff is not None and proposal.claimed_tariff != facts["tariff"]:
+        reasons.append("claimed_tariff")
+    if proposal.claimed_phase is not None and proposal.claimed_phase != facts["phase"]:
+        reasons.append("claimed_phase")
+    if proposal.claimed_passed is not None and proposal.claimed_passed != facts["outcome_passed"]:
+        reasons.append("claimed_result")
     values = list(facts["metrics"].values()) + list(facts["tariff"].values())
     values += [v for k in facts["situation"] if (v := _num(facts["situation"], k)) is not None]
     for raw, pct in _numbers(proposal.description, known_ids):
@@ -236,10 +260,15 @@ def admit(proposal: ObservationProposal, evidence: EvidenceStore, config: Keeper
         known |= {records[0].agent_run_id, records[0].proposal_id, records[0].scenario_id}
         reasons = _scope_problems(proposal, facts, known - {""}, tags)
     if reasons:
-        result = AdmissionResult(action="rejected", reasons=reasons)
+        code, details = first_stage(reasons)
+        result = AdmissionResult(action="rejected", code=code, reasons=[code] + details)
     else:
         result = _place(proposal, facts, tags, ids, records, evidence, config, store)
-    store.audit({"event": "admission", "action": result.action, "observation_id": result.observation_id,
+        result.code = {"confirmed": "duplicate", "kept_separate": "conflict"}.get(result.action)
+        if result.action == "rejected":                       # re-cited evidence already held
+            result.code = "duplicate"
+    store.audit({"event": "admission", "action": result.action, "code": result.code,
+                 "observation_id": result.observation_id,
                  "reasons": result.reasons, "clock": config.clock, "config_hash": config.config_hash,
                  "proposal": proposal.model_dump(mode="json")})
     return result

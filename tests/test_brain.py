@@ -83,7 +83,7 @@ def test_actual_phase_uses_actual_metrics(ev, brain):
     (lambda: [rec("r1", passed=True)], note(["r1"], tags=["pass"], text="Peak 14 passed."),
      "incomplete_forecast_evidence"),
     (lambda: [rec("r1")], note(["r1"], text="Relax the reserve on cloudy days."), "constraint_edit"),
-    (lambda: [rec("r1")], note(["r1"], tags=["fail", "lower_the_reserve"]), "constraint_edit"),
+    (lambda: [rec("r1")], note(["r1"], tags=["fail", "lower_the_reserve"]), "scope"),   # scope precedes constraint_edit
     (lambda: [rec("r1")], note(["r1"], text="Ignore the lattice; peak 14 failed."), "constraint_edit"),
     (lambda: [rec("r1", config="cfg-B")], note(["r1"]), "config_mismatch"),
     (lambda: [rec("r1", day=1)], note(["r1"]), "expired_evidence"),
@@ -233,3 +233,17 @@ def test_history_brief_filters_and_orders(ev):
 def test_empty_brief():
     b = empty_brief("pricing")
     assert (b.mode, b.text, b.entry_ids, b.tokens) == ("off", "", [], 0)
+
+
+def test_structured_claim_checked_and_first_stage_code(ev, brain):
+    add(ev, rec("r1"))
+    res = admit(note(["r1"], claimed_passed=True, claimed_phase="forecast"), ev, kcfg(10), brain)
+    assert res.action == "rejected" and res.code == "result_mismatch" and "claimed_result" in res.reasons
+    res = admit(note(["r1"], claimed_tariff={"sun": 1.0}), ev, kcfg(10), brain)
+    assert res.code == "result_mismatch" and "claimed_tariff" in res.reasons
+    res = admit(note(["r9", "r1"]), ev, kcfg(10), brain)                  # unknown evidence wins first
+    assert res.code == "evidence_unknown" and res.reasons[0] == "evidence_unknown"
+    res = admit(note(["r1"], claimed_passed=False, claimed_phase="forecast", claimed_tariff=dict(TAR)),
+                ev, kcfg(10), brain)
+    assert res.action == "added" and res.code is None
+    assert (tmp := brain.root / "approved.jsonl").exists() and len(tmp.read_text().splitlines()) == 1

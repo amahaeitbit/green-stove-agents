@@ -23,7 +23,10 @@ existing memory entry already says the same, set duplicate_of to its id; if it s
 opposite for the same situation and tariff, list it in conflicts_with.
 Reply with ONLY a JSON object:
 {"observations": [{"evidence_ids": [...], "situation_tags": [...], "description": "...",
-  "duplicate_of": null, "conflicts_with": []}]}"""
+  "claimed_tariff": {"<window>": <price>}, "claimed_phase": "forecast" | "actual",
+  "claimed_passed": true | false, "duplicate_of": null, "conflicts_with": []}]}
+claimed_phase is "actual" if any cited evidence is from the actual day, else "forecast";
+claimed_passed is true only if every cited evidence record passed."""
 
 
 def summarize(records: list[EvidenceRecord]) -> list[dict[str, Any]]:
@@ -75,5 +78,7 @@ def mock_note_writer(payload: dict[str, Any]) -> dict[str, Any]:
         notes.append({"evidence_ids": [e["evidence_id"] for e in chosen],
                       "situation_tags": _tags(decisive["situation"], passed, decisive["phase"], codes),
                       "description": f"Prices {prices} {verb}; {detail}.",
+                      "claimed_tariff": decisive["tariff"], "claimed_phase": "actual" if actual else "forecast",
+                      "claimed_passed": passed,
                       "duplicate_of": None, "conflicts_with": []})
     return {"observations": notes}

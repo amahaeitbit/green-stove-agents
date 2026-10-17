@@ -36,6 +36,13 @@ class ObservationProposal(_Strict):
     description: str = Field(max_length=300)
     duplicate_of: str | None = None
     conflicts_with: list[str] = Field(default_factory=list, max_length=5)
+    # structured claim, checked by the Keeper against what it recomputes from evidence
+    claimed_tariff: dict[str, float] | None = None
+    claimed_phase: Literal["forecast", "actual"] | None = None
+    claimed_passed: bool | None = None
+
+
+NoteProposal = ObservationProposal          # name used in the team diagram
 
 
 class NoteWriterOutput(_Strict):
@@ -90,8 +97,13 @@ class ApprovedObservation(_Strict):
     conflict_group: str | None = None
 
 
+KEEPER_CODES = ("evidence_unknown", "evidence_expired", "result_mismatch", "scope", "constraint_edit",
+                "duplicate", "conflict")
+
+
 class AdmissionResult(_Strict):
     action: Literal["added", "confirmed", "kept_separate", "rejected"]
+    code: str | None = None                          # first failing Keeper stage (KEEPER_CODES)
     observation_id: str | None = None
     reasons: list[str] = []
 

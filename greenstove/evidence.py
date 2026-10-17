@@ -40,10 +40,28 @@ class EvidenceStore:
     def all(self) -> list[EvidenceRecord]:
         return list(self._load().values())
 
+    def run_dir(self, run_id: str) -> Path:
+        d = self._runs / run_id
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+
+    def write(self, run_id: str, name: str, obj) -> Path:
+        """runs/<run_id>/<name>.json: requests, tariff_N, reservations_N, verdict_N_<phase>, status."""
+        path = self.run_dir(run_id) / f"{name}.json"
+        data = obj.model_dump(mode="json") if hasattr(obj, "model_dump") else obj
+        if isinstance(data, list):
+            data = [x.model_dump(mode="json") if hasattr(x, "model_dump") else x for x in data]
+        path.write_text(json.dumps(data, indent=1, default=str))
+        return path
+
     def save_run(self, run: RunRecord) -> Path:
-        path = self._runs / f"{run.agent_run_id}.json"
+        self.write(run.agent_run_id, "status", {"status": run.status, "reason": run.reason,
+                                                 "selected_proposal_id": run.selected_proposal_id,
+                                                 "selected_tariff": run.selected_tariff,
+                                                 "execution": run.execution.model_dump() if run.execution else None})
+        path = self.run_dir(run.agent_run_id) / "run.json"
         path.write_text(run.model_dump_json(indent=2))
         return path
 
     def runs(self) -> list[RunRecord]:
-        return [RunRecord.model_validate_json(p.read_text()) for p in sorted(self._runs.glob("*.json"))]
+        return [RunRecord.model_validate_json(p.read_text()) for p in sorted(self._runs.glob("*/run.json"))]

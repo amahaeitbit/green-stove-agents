@@ -27,7 +27,25 @@ def data_dir() -> Path:
 
 
 def make_llm(mode: str | None) -> LLMClient:
-    return LLMClient(LLMSettings.from_env(mode), MOCKS)
+    return LLMClient(LLMSettings.from_env(mode), MOCKS, usage_path=data_dir() / "usage.jsonl")
+
+
+CONDITIONS = {"A": "off", "B": "history", "C": "curated"}
+
+
+def cmd_decide(a) -> int:
+    """The day's full decision record for operators (runs one agent day, then prints decision.md)."""
+    a.brain = CONDITIONS[a.condition]
+    a.execute = True
+    a.show_decision = True
+    return cmd_plan(a)
+
+
+def cmd_run(a) -> int:
+    """gsa run --condition A|B|C --mode mock|live: one fresh agent day (development phase)."""
+    a.brain = CONDITIONS[a.condition]
+    a.execute = True
+    return cmd_plan(a)
 
 
 def banner(llm: LLMClient, env_name: str) -> None:
@@ -98,6 +116,14 @@ def cmd_plan(a) -> int:
     run = supervisor.run_agent_day(ctx, a.brain, DEFAULT_REQUIREMENTS, env=env, llm=llm,
                                    evidence=evidence, brain=brain, actual=actual)
     show_run(console, ctx, run, env, DEFAULT_REQUIREMENTS)
+    from greenstove.decision import brief_lines, render_decision
+    text = render_decision(ctx, run, env, DEFAULT_REQUIREMENTS, brief_lines(run.brief.text))
+    path = evidence.run_dir(run.agent_run_id) / "decision.md"
+    path.write_text(text)
+    if getattr(a, "show_decision", False):
+        from rich.markdown import Markdown
+        console.print(Markdown(text))
+    console.print(f"decision record: {path.relative_to(ROOT)}")
     return 0
 
 
@@ -240,32 +266,42 @@ def cmd_demo(a) -> int:
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="greenstove")
     sub = p.add_subparsers(dest="cmd", required=True)
-    s = sub.add_parser("smoke"); s.add_argument("--mode", choices=["mock", "crusoe"]); s.set_defaults(fn=cmd_smoke)
+    s = sub.add_parser("smoke"); s.add_argument("--mode", choices=["mock", "live", "crusoe"]); s.set_defaults(fn=cmd_smoke)
     s = sub.add_parser("plan")
     s.add_argument("--scenario", required=True); s.add_argument("--brain", default="curated",
                                                                 choices=["off", "history", "curated"])
-    s.add_argument("--execute", action="store_true"); s.add_argument("--mode", choices=["mock", "crusoe"])
+    s.add_argument("--execute", action="store_true"); s.add_argument("--mode", choices=["mock", "live", "crusoe"])
     s.add_argument("--stub", action="store_true"); s.set_defaults(fn=cmd_plan)
-    s = sub.add_parser("warmup"); s.add_argument("--mode", choices=["mock", "crusoe"])
+    s = sub.add_parser("warmup"); s.add_argument("--mode", choices=["mock", "live", "crusoe"])
     s.add_argument("--stub", action="store_true"); s.set_defaults(fn=cmd_warmup)
     s = sub.add_parser("brain"); s.add_argument("action", choices=["show", "audit", "freeze"], nargs="?", default="show")
     s.add_argument("--out", default="data/brain-frozen"); s.add_argument("--limit", type=int, default=30)
     s.set_defaults(fn=cmd_brain)
     s = sub.add_parser("demo")
     s.add_argument("--scene", default="all", choices=["all", "world", "proposal", "memory", "handoff", "infeasible"])
-    s.add_argument("--mode", choices=["mock", "crusoe"]); s.add_argument("--stub", action="store_true")
+    s.add_argument("--mode", choices=["mock", "live", "crusoe"]); s.add_argument("--stub", action="store_true")
     s.add_argument("--replay", help="print a recorded demo transcript (labeled RECORDED)")
     s.add_argument("--pause", action="store_true", help="wait for Enter between scenes")
     s.add_argument("--dev-brain", action="store_true", help="use the warm-up brain instead of a fresh demo workspace")
     s.set_defaults(fn=cmd_demo)
-    s = sub.add_parser("preflight"); s.add_argument("--mode", choices=["mock", "crusoe"]); s.set_defaults(fn=cmd_preflight)
+    s = sub.add_parser("run", help="one agent day: --condition A (facts) | B (raw history) | C (curated brain)")
+    s.add_argument("--condition", choices=list(CONDITIONS), default="C")
+    s.add_argument("--scenario", default="demo-handoff-overcast")
+    s.add_argument("--mode", choices=["mock", "live", "crusoe"]); s.add_argument("--stub", action="store_true")
+    s.set_defaults(fn=cmd_run)
+    s = sub.add_parser("decide", help="run one day and print the operator decision record")
+    s.add_argument("--condition", choices=list(CONDITIONS), default="C")
+    s.add_argument("--scenario", default="demo-handoff-overcast")
+    s.add_argument("--mode", choices=["mock", "live", "crusoe"]); s.add_argument("--stub", action="store_true")
+    s.set_defaults(fn=cmd_decide)
+    s = sub.add_parser("preflight"); s.add_argument("--mode", choices=["mock", "live", "crusoe"]); s.set_defaults(fn=cmd_preflight)
     s = sub.add_parser("freeze"); s.add_argument("--out"); s.set_defaults(fn=cmd_freeze)
     s = sub.add_parser("eval-agents", help="conditions A/B/C on held-out days with frozen memory")
     s.add_argument("--freeze", required=True); s.add_argument("--out"); s.add_argument("--days", type=int, default=8)
-    s.add_argument("--mode", choices=["mock", "crusoe"]); s.add_argument("--stub", action="store_true")
+    s.add_argument("--mode", choices=["mock", "live", "crusoe"]); s.add_argument("--stub", action="store_true")
     s.set_defaults(fn=cmd_eval_agents)
     s = sub.add_parser("e2e", help="smoke, warmup, freeze, held-out A/B/C, recorded demo")
-    s.add_argument("--mode", choices=["mock", "crusoe"]); s.add_argument("--days", type=int, default=8)
+    s.add_argument("--mode", choices=["mock", "live", "crusoe"]); s.add_argument("--days", type=int, default=8)
     s.add_argument("--skip-demo", action="store_true"); s.set_defaults(fn=cmd_e2e)
     a = p.parse_args(argv)
     try:

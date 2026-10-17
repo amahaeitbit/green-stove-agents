@@ -12,8 +12,9 @@ from typing import Iterable
 
 from greenstove.agent_models import ApprovedObservation, stable_hash
 
-BRAIN_FILE = "brain.json"
-AUDIT_FILE = "audit.jsonl"
+BRAIN_FILE = "approved.jsonl"     # one approved observation per line (successes and failures)
+META_FILE = "meta.json"           # frozen flag, cap, snapshot hash
+AUDIT_FILE = "audit.jsonl"        # admissions, rejections, evictions; never served
 _OBS_ID = re.compile(r"^obs-(\d+)$")
 
 
@@ -47,17 +48,20 @@ class BrainStore:
         if not frozen:
             self.root.mkdir(parents=True, exist_ok=True)
         self._brain = self.root / BRAIN_FILE
+        self._meta = self.root / META_FILE
         self._audit = self.root / AUDIT_FILE
         self._entries: dict[str, ApprovedObservation] = {}
         self._recorded_hash: str | None = None
+        if self._meta.exists():
+            meta = json.loads(self._meta.read_text())
+            self.frozen = self.frozen or bool(meta.get("frozen", False))
+            self.cap = int(meta.get("cap", cap))
+            self._recorded_hash = meta.get("snapshot_hash")
         if self._brain.exists():
-            data = json.loads(self._brain.read_text())
-            self.frozen = self.frozen or bool(data.get("frozen", False))
-            self.cap = int(data.get("cap", cap))
-            self._recorded_hash = data.get("snapshot_hash")
-            for raw in data.get("entries", []):
-                obs = ApprovedObservation.model_validate(raw)
-                self._entries[obs.id] = obs
+            for line in self._brain.read_text().splitlines():
+                if line.strip():
+                    obs = ApprovedObservation.model_validate_json(line)
+                    self._entries[obs.id] = obs
         self._seq = len(self.audit_log())
 
     # ---- loading / freezing ------------------------------------------------------
@@ -66,8 +70,8 @@ class BrainStore:
     def load_frozen(cls, path: Path) -> "BrainStore":
         """Open a snapshot read-only; refuse it if its recorded hash does not match."""
         path = Path(path)
-        if not (path / BRAIN_FILE).exists():
-            raise FileNotFoundError(path / BRAIN_FILE)
+        if not (path / META_FILE).exists():
+            raise FileNotFoundError(path / META_FILE)
         store = cls(path, frozen=True)
         if store._recorded_hash and store._recorded_hash != store.snapshot_hash():
             raise ValueError(f"snapshot hash mismatch in {path}")
@@ -77,7 +81,7 @@ class BrainStore:
         """Write a frozen copy (brain + audit) to dest and return its snapshot hash."""
         dest = Path(dest)
         dest.mkdir(parents=True, exist_ok=True)
-        _atomic_write(dest / BRAIN_FILE, self._dump(frozen=True))
+        self._write(dest, frozen=True)
         audit = self._audit.read_text() if self._audit.exists() else ""
         _atomic_write(dest / AUDIT_FILE, audit)
         return self.snapshot_hash()
@@ -116,7 +120,7 @@ class BrainStore:
         self._check_writable()
         obs = ApprovedObservation.model_validate(obs.model_dump())
         self._entries[obs.id] = obs
-        _atomic_write(self._brain, self._dump(frozen=False))
+        self._write(self.root, frozen=False)
 
     def audit(self, event: dict) -> int:
         """Append one event with a sequence number; returns that number."""
@@ -139,7 +143,7 @@ class BrainStore:
                 done.append(e.id)
         return done
 
-    def _dump(self, frozen: bool) -> str:
-        data = {"frozen": frozen, "cap": self.cap, "snapshot_hash": self.snapshot_hash(),
-                "entries": [e.model_dump(mode="json") for e in self.entries()]}
-        return json.dumps(data, indent=1, sort_keys=True)
+    def _write(self, root: Path, frozen: bool) -> None:
+        _atomic_write(root / BRAIN_FILE, "".join(e.model_dump_json() + "\n" for e in self.entries()))
+        _atomic_write(root / META_FILE, json.dumps({"frozen": frozen, "cap": self.cap, "entries": len(self._entries),
+                                                    "snapshot_hash": self.snapshot_hash()}, indent=1))
