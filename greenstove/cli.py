@@ -500,6 +500,12 @@ def cmd_e2e(a) -> int:
         results.append(("report", "ok" if code == 0 else f"skipped/warn (exit {code})", "results report for judges"))
         lines.append(f"| report | {results[-1][1]} | results report for judges |")
         (root / "e2e-summary.md").write_text("\n".join(lines) + "\n")
+    if "replay" in subs:                          # HTML replay of the recorded demo + this run's results
+        console.rule("[bold]e2e · replay")
+        code = main(["replay", "--e2e", str(root), "--out", str(root / "replay.html")])
+        results.append(("replay", "ok" if code == 0 else f"skipped/warn (exit {code})", "HTML run replay"))
+        lines.append(f"| replay | {results[-1][1]} | HTML run replay |")
+        (root / "e2e-summary.md").write_text("\n".join(lines) + "\n")
     console.rule("[bold]e2e summary")
     for n, s, w in results:
         console.print(f"{n:16} {s:24} {w}", markup=False)
@@ -511,7 +517,7 @@ def cmd_e2e(a) -> int:
 def _subcommands() -> set[str]:
     p = argparse.ArgumentParser()
     sub = p.add_subparsers(dest="cmd")
-    for optional in ("runner", "comparators", "results", "acceptance"):
+    for optional in ("runner", "comparators", "results", "acceptance", "replay"):
         try:
             __import__(f"greenstove.{optional}", fromlist=["register"]).register(sub)
         except ImportError:
@@ -591,7 +597,7 @@ def main(argv: list[str] | None = None) -> int:
     from greenstove import evolve, tracks
     evolve.register(sub)                          # playbook show|history|before-after, evolve (Version N+1)
     tracks.register(sub)                          # tracks: requirement-by-requirement scorecard for the 3 tracks
-    for optional in ("runner", "comparators", "results", "acceptance"):   # runner, compare, report, acceptance
+    for optional in ("runner", "comparators", "results", "acceptance", "replay"):   # + HTML run replay
         try:
             __import__(f"greenstove.{optional}", fromlist=["register"]).register(sub)
         except ImportError:
