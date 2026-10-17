@@ -51,7 +51,7 @@ def cmd_smoke(a) -> int:
     from greenstove.scenarios import DEMO_SCENARIOS, make_context
     from greenstove.agent_models import Brief
     name = next(iter(DEMO_SCENARIOS))
-    ctx = make_context(**DEMO_SCENARIOS[name])
+    ctx = context_for(DEMO_SCENARIOS[name])
     t0 = time.monotonic()
     prop, errors, calls = pricing_agent.propose(ctx, Brief(role="pricing", mode="off"), [], llm, 1, "smoke-p1")
     console.print(f"proposal: {prop.prices if prop else None}  errors: {errors}  "
@@ -66,6 +66,12 @@ def cmd_smoke(a) -> int:
                                 "calls": [c.model_dump() for c in llm.calls]}, indent=2))
     console.print(f"recorded: {path.relative_to(ROOT)}")
     return 0 if prop else 1
+
+
+def context_for(spec):
+    """Scenario specs may be dicts or (seed, weather, battery_frac, demand, flex, day) tuples."""
+    from greenstove.scenarios import make_context
+    return make_context(**spec) if isinstance(spec, dict) else make_context(*spec)
 
 
 def stores() -> tuple[EvidenceStore, BrainStore]:
@@ -84,7 +90,7 @@ def cmd_plan(a) -> int:
     if a.scenario != "infeasible" and a.scenario not in named:
         console.print(f"[red]unknown scenario[/] {a.scenario}; choose from {sorted(named) + ['infeasible']}")
         return 1
-    ctx = infeasible_context() if a.scenario == "infeasible" else make_context(**named[a.scenario])
+    ctx = infeasible_context() if a.scenario == "infeasible" else context_for(named[a.scenario])
     evidence, brain = stores()
     actual = make_actual(ctx, seed=ctx.day + 7) if a.execute else None
     run = supervisor.run_agent_day(ctx, a.brain, DEFAULT_REQUIREMENTS, env=env, llm=llm,
@@ -100,7 +106,7 @@ def cmd_warmup(a) -> int:
     banner(llm, env.name)
     evidence, brain = stores()
     for name, spec in DEV_SCENARIOS.items():
-        ctx = make_context(**spec)
+        ctx = context_for(spec)
         run = supervisor.run_agent_day(ctx, "curated", DEFAULT_REQUIREMENTS, env=env, llm=llm, evidence=evidence,
                                        brain=brain, actual=make_actual(ctx, seed=ctx.day + 7))
         notes = ", ".join(f"{n.action}:{n.observation_id or '-'}" for n in run.notes)

@@ -107,8 +107,8 @@ def main(a) -> int:
     req = DEFAULT_REQUIREMENTS
     scenarios = {**DEV_SCENARIOS, **DEMO_SCENARIOS}
     pick = lambda name, pool: name if name in scenarios else next(iter(pool))  # noqa: E731
-    pctx = make_context(**scenarios[pick(PROPOSAL_SCENARIO, DEV_SCENARIOS)])
-    hctx = make_context(**scenarios[pick(HANDOFF_SCENARIO, DEMO_SCENARIOS)])
+    pctx = cli.context_for(scenarios[pick(PROPOSAL_SCENARIO, DEV_SCENARIOS)])
+    hctx = cli.context_for(scenarios[pick(HANDOFF_SCENARIO, DEMO_SCENARIOS)])
     scenes = ["world", "proposal", "memory", "handoff", "infeasible"] if a.scene == "all" else [a.scene]
     run = None
     for scene in scenes:
