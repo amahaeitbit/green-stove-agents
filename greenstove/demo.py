@@ -104,12 +104,21 @@ def main(a) -> int:
     llm, env = cli.make_llm(a.mode), load_environment(prefer_stub=a.stub)
     cli.console = c
     cli.banner(llm, env.name)
-    evidence, brain = cli.stores()
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    if a.dev_brain:
+        evidence, brain = cli.stores()
+        c.print("memory: development brain from `warmup`")
+    else:                                  # fresh workspace: scene 3 writes what scene 4 reads
+        from greenstove.brain.store import BrainStore
+        from greenstove.evidence import EvidenceStore
+        work = out_dir / f"work-{stamp}"
+        evidence, brain = EvidenceStore(work / "evidence"), BrainStore(work / "brain")
+        c.print(f"memory: fresh demo workspace {work.relative_to(cli.ROOT)}")
     req = DEFAULT_REQUIREMENTS
     scenarios = {**DEV_SCENARIOS, **DEMO_SCENARIOS}
     pick = lambda name, pool: name if name in scenarios else next(iter(pool))  # noqa: E731
-    pctx = cli.context_for(scenarios[pick(PROPOSAL_SCENARIO, DEV_SCENARIOS)])
-    hctx = cli.context_for(scenarios[pick(HANDOFF_SCENARIO, DEMO_SCENARIOS)])
+    pctx = cli.context_for(pick(PROPOSAL_SCENARIO, DEV_SCENARIOS))
+    hctx = cli.context_for(pick(HANDOFF_SCENARIO, DEMO_SCENARIOS))
     scenes = ["world", "proposal", "memory", "handoff", "infeasible"] if a.scene == "all" else [a.scene]
     run = None
     for scene in scenes:
@@ -160,7 +169,6 @@ def main(a) -> int:
         if a.pause and scene != scenes[-1]:
             input("[Enter] next scene ")
     out_dir.mkdir(parents=True, exist_ok=True)
-    stamp = time.strftime("%Y%m%d-%H%M%S")
     path = out_dir / f"demo-{llm.s.mode}-{stamp}.txt"
     c.save_text(str(path))
     c.print(f"recorded transcript: {path}")

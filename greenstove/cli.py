@@ -51,7 +51,7 @@ def cmd_smoke(a) -> int:
     from greenstove.scenarios import DEMO_SCENARIOS, make_context
     from greenstove.agent_models import Brief
     name = next(iter(DEMO_SCENARIOS))
-    ctx = context_for(DEMO_SCENARIOS[name])
+    ctx = context_for(name)
     t0 = time.monotonic()
     prop, errors, calls = pricing_agent.propose(ctx, Brief(role="pricing", mode="off"), [], llm, 1, "smoke-p1")
     console.print(f"proposal: {prop.prices if prop else None}  errors: {errors}  "
@@ -68,10 +68,10 @@ def cmd_smoke(a) -> int:
     return 0 if prop else 1
 
 
-def context_for(spec):
-    """Scenario specs may be dicts or (seed, weather, battery_frac, demand, flex, day) tuples."""
-    from greenstove.scenarios import make_context
-    return make_context(**spec) if isinstance(spec, dict) else make_context(*spec)
+def context_for(name: str):
+    """Named development/demo scenario; its scenario_id equals the name."""
+    from greenstove.scenarios import infeasible_context, scenario
+    return infeasible_context() if name == "infeasible" else scenario(name)
 
 
 def stores() -> tuple[EvidenceStore, BrainStore]:
@@ -90,7 +90,7 @@ def cmd_plan(a) -> int:
     if a.scenario != "infeasible" and a.scenario not in named:
         console.print(f"[red]unknown scenario[/] {a.scenario}; choose from {sorted(named) + ['infeasible']}")
         return 1
-    ctx = infeasible_context() if a.scenario == "infeasible" else context_for(named[a.scenario])
+    ctx = context_for(a.scenario)
     evidence, brain = stores()
     actual = make_actual(ctx, seed=ctx.day + 7) if a.execute else None
     run = supervisor.run_agent_day(ctx, a.brain, DEFAULT_REQUIREMENTS, env=env, llm=llm,
@@ -105,8 +105,8 @@ def cmd_warmup(a) -> int:
     llm, env = make_llm(a.mode), load_environment(prefer_stub=a.stub)
     banner(llm, env.name)
     evidence, brain = stores()
-    for name, spec in DEV_SCENARIOS.items():
-        ctx = context_for(spec)
+    for name in DEV_SCENARIOS:
+        ctx = context_for(name)
         run = supervisor.run_agent_day(ctx, "curated", DEFAULT_REQUIREMENTS, env=env, llm=llm, evidence=evidence,
                                        brain=brain, actual=make_actual(ctx, seed=ctx.day + 7))
         notes = ", ".join(f"{n.action}:{n.observation_id or '-'}" for n in run.notes)
@@ -158,6 +158,7 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--mode", choices=["mock", "crusoe"]); s.add_argument("--stub", action="store_true")
     s.add_argument("--replay", help="print a recorded demo transcript (labeled RECORDED)")
     s.add_argument("--pause", action="store_true", help="wait for Enter between scenes")
+    s.add_argument("--dev-brain", action="store_true", help="use the warm-up brain instead of a fresh demo workspace")
     s.set_defaults(fn=cmd_demo)
     a = p.parse_args(argv)
     try:

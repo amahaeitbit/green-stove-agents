@@ -25,8 +25,10 @@ All commands run as `.venv/bin/python -m greenstove <command>` from the repo roo
    `GREENSTOVE_LLM=crusoe` and `GREENSTOVE_LIVE_SPEND_OK=1` in `.env`.
 4. `python -m greenstove smoke --mode crusoe`: the Nemotron id is in the catalog, one
    valid proposal comes back, and the call is recorded under `data/smoke/`.
-5. Build the development brain (it is used by the handoff scene):
-   `python -m greenstove warmup --mode crusoe`, then `python -m greenstove brain show`.
+5. Optional: build the development brain with `python -m greenstove warmup --mode crusoe`
+   and inspect it with `brain show`. The demo itself starts from a fresh memory workspace,
+   so the observation the Keeper admits in the memory scene is exactly what the fresh agent
+   reads in the handoff scene. `demo --dev-brain` uses the warm-up brain instead.
 6. Record a full fallback run: `python -m greenstove demo --mode crusoe`. Note the
    transcript path it prints (`data/demo/demo-crusoe-<time>.txt`).
 7. Check the banner says which world is running. If it says `stub-env (development
@@ -60,7 +62,7 @@ Single scenes also work: `demo --scene world|proposal|memory|handoff|infeasible`
 | Crusoe error, 429 or 503 mid-demo | The client already backs off; if it still fails, rerun the scene with `--mode mock` | Banner shows MOCK (rule-based stand-in) |
 | No network | `demo --replay data/demo/demo-crusoe-<time>.txt` from preflight step 6 | RECORDED |
 | Abel's world not merged | Run as is | Banner shows stub-env; say it out loud |
-| Brain empty in the handoff scene | `warmup` first (preflight step 5) | — |
+| Handoff brief empty | The proposal scene did not run in the same process; rerun `demo` with all scenes, or use `--dev-brain` after `warmup` | — |
 
 Never present mock output as model quality, and never present a replay as live.
 
