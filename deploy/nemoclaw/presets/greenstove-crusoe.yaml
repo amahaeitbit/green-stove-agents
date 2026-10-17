@@ -1,0 +1,25 @@
+# Custom NemoClaw policy preset: Crusoe Managed Inference, called directly by the gsa Python process.
+# Format: https://docs.nvidia.com/nemoclaw/latest/user-guide/deepagents/network-policy/configure-policies/create-custom-policy-presets.html
+# Endpoint fields copied from the Deep Agents baseline policy:
+#   https://raw.githubusercontent.com/NVIDIA/NemoClaw/main/agents/langchain-deepagents-code/policy-additions.yaml
+# Apply:  nemo-deepagents <sandbox> policy add --from-file deploy/nemoclaw/presets/greenstove-crusoe.yaml --dry-run
+#         nemo-deepagents <sandbox> policy add --from-file deploy/nemoclaw/presets/greenstove-crusoe.yaml --yes
+# UNVERIFIED on a real sandbox: the binary paths. Confirm them with `openshell term` when the first call is blocked.
+preset:
+  name: greenstove-crusoe
+  description: "Crusoe Managed Inference for Green-Stove agents (chat completions + model catalog)"
+network_policies:
+  greenstove-crusoe:
+    name: greenstove-crusoe
+    endpoints:
+      - host: api.inference.crusoecloud.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: POST, path: "/v1/chat/completions" }
+          - allow: { method: GET, path: "/v1/models" }
+          - allow: { method: GET, path: "/v1/models/**" }
+    binaries:
+      - { path: /sandbox/**/bin/python3* }
+      - { path: /opt/venv/bin/python3* }
