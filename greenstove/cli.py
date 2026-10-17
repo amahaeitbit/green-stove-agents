@@ -436,6 +436,7 @@ def cmd_e2e(a) -> int:
     fc = root / "forecast" / f"asmara-eritrea-{day}-{'live' if live else 'mock'}.json"
     subs = _subcommands()
     has_runner, has_compare, has_report = "runner" in subs, "compare" in subs, "report" in subs
+    has_acceptance = "acceptance" in subs
     steps = [  # (name, argv, required, what it shows)
         ("preflight", ["preflight"] + mode, False, "readiness: keys, spend flag, model id, world, tests"),
         ("smoke", ["smoke"] + mode, True, "one structured Crusoe call recorded"),
@@ -460,8 +461,8 @@ def cmd_e2e(a) -> int:
         ("tracks", ["tracks", "--out", str(root / "tracks")], False,
          "scorecard: every requirement of Done Means Done, Shared Brain, Version N+1"),
         ("usage", ["usage"], False, "calls, tokens, cache hits, latency, cost"),
-        ("report", ["report", "--e2e", str(root), "--out", str(root / "results.md")], False,
-         "results report for judges") if has_report else None,
+        ("acceptance", ["acceptance"], False, "Abel's joint acceptance run through the app (admission ledger)")
+        if has_acceptance else None,
     ]
     results, warned, failed = [], [], []
     for step in filter(None, steps):
@@ -489,6 +490,12 @@ def cmd_e2e(a) -> int:
     lines += ["", "Outputs: smoke/, crusoe/, forecast/, evidence/ (runs, decision.md), brain/, freeze/, eval/, playbook/, "
               "events/, demo/, usage.jsonl"]
     (root / "e2e-summary.md").write_text("\n".join(lines) + "\n")
+    if has_report:                                # needs the summary, so it runs last
+        console.rule("[bold]e2e · report")
+        code = main(["report", "--e2e", str(root), "--out", str(root / "results.md")])
+        results.append(("report", "ok" if code == 0 else f"skipped/warn (exit {code})", "results report for judges"))
+        lines.append(f"| report | {results[-1][1]} | results report for judges |")
+        (root / "e2e-summary.md").write_text("\n".join(lines) + "\n")
     console.rule("[bold]e2e summary")
     for n, s, w in results:
         console.print(f"{n:16} {s:24} {w}", markup=False)
@@ -500,7 +507,7 @@ def cmd_e2e(a) -> int:
 def _subcommands() -> set[str]:
     p = argparse.ArgumentParser()
     sub = p.add_subparsers(dest="cmd")
-    for optional in ("runner", "comparators", "results"):
+    for optional in ("runner", "comparators", "results", "acceptance"):
         try:
             __import__(f"greenstove.{optional}", fromlist=["register"]).register(sub)
         except ImportError:
@@ -580,7 +587,7 @@ def main(argv: list[str] | None = None) -> int:
     from greenstove import evolve, tracks
     evolve.register(sub)                          # playbook show|history|before-after, evolve (Version N+1)
     tracks.register(sub)                          # tracks: requirement-by-requirement scorecard for the 3 tracks
-    for optional in ("runner", "comparators", "results"):   # always-on runner, six-condition compare, report
+    for optional in ("runner", "comparators", "results", "acceptance"):   # runner, compare, report, acceptance
         try:
             __import__(f"greenstove.{optional}", fromlist=["register"]).register(sub)
         except ImportError:
