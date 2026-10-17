@@ -8,7 +8,9 @@ flowchart TD
     SA --> SV{{Spec validation<br/>code adds / tightens}}
     SV --> DOD[Definition of done]
     F[Forecast + downside] --> L[Limits<br/>code: stove cap, reserve]
-    M[(Federation lessons)] --> PA
+    B[(Shared Brain<br/>Keeper-curated)] -->|role briefs| SA
+    B -->|role briefs| PA
+    B -->|role briefs| SMS
     DOD --> PA[Pricing Agent<br/>model: tariff]
     L --> PA
     PA --> PV{{Tariff validation<br/>bounds, grid, change cap}}
@@ -27,7 +29,11 @@ flowchart TD
     EX -->|drift| SU
     SU -->|money / safety only| H[Human ping<br/>genset, clinic shed, priority defer]
     EX --> LG[(Ledger)]
-    EX --> M
+    EX -->|evidence| K{{Keeper<br/>code: evidence check,<br/>conflicts, caps, expiry}}
+    VE -->|verdicts| K
+    PA -->|notes| K
+    K --> B
+    B <-->|sync| HQ[(Village / HQ brains)]
 ```
 
 ## Who decides what
@@ -44,7 +50,8 @@ flowchart TD
 | SMS checker | Controller | code | Send, or fall back to template | — |
 | Reply parser | Controller | grammar, model fallback | Intent of a reply | Produce authority actions (`VERIFY`, `YES`, `NO`) from free text |
 | Ledger | Controller, synced | code | Debits and credits | — |
-| Federation | Controller + HQ | code | Which lessons are stored and retrieved | Store model-written lessons |
+| Shared Brain Keeper | Controller + HQ | code | Which notes enter the brain, conflicts, expiry, sync | Admit a note without matching evidence; let agents write facts or decisions |
+| Brief compiler | Controller | code | What each agent reads before a call, under a token budget | Serve superseded or expired entries |
 
 ## Where it runs and what happens offline
 

@@ -6,6 +6,9 @@ Oct 17, 2026 · @isaac
 
 > **Status: plans only.** This repository holds the design and build plan. No code has
 > been written yet. Start with [PLAN.md](PLAN.md).
+>
+> **Hackathon entry:** Shared Brain problem statement, built on a Done Means Done loop.
+> Recursive Agents Hackathon (Cerebral Valley × Crusoe), October 17, 2026.
 
 ## Problem
 
@@ -51,6 +54,17 @@ the grid unattended.
    only in the committee's order (revenue gives before meals), and reports "done with N
    relaxations" or "not done", never a fake success. It pings a human only for money and
    safety: genset start, clinic load shedding, deferring a priority household.
+
+## Shared Brain
+
+Every agent on the team (Spec, Pricing, SMS, reply parser, Supervisor) reads a short brief
+from one shared memory before it works: the village's facts, yesterday's state, the
+pricing playbook for today's weather, verified lessons, SMS wording that passed the
+checker, recent human decisions. Afterward, code writes what the run proved, and a Keeper
+admits agent notes only when they match simulator or meter evidence. It resolves conflicts
+by evidence and keeps each section capped and fresh. Stations and villages sync their
+brains, so a new village starts from what others proved. We measure the brain on, off,
+and as a naive history dump, on unseen days. See [PLAN.md](PLAN.md) sections 9 and 10.
 
 ## How it fits Green-Stove
 

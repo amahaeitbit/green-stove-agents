@@ -50,7 +50,22 @@ cook in their granted slot; the rest arrive at their own requested slot as walk-
 | `agents` | Model tariff, loop | code-derived limits | Verifier + Supervisor | hourly drift replans |
 
 `agents_no_verifier` separates what code-derived safety limits buy from what the
-verify-and-relax loop buys. A `--no-federation` flag runs `agents` without lessons.
+verify-and-relax loop buys.
+
+## Shared Brain modes (the headline comparison)
+
+| Mode | What agents read before each call |
+| --- | --- |
+| `off` | Facts only; every day starts from zero |
+| `dump` | Facts plus previous attempts and reports appended, up to the same token budget |
+| `on` | Keeper-curated role briefs |
+
+Warm up on development days 0–19 of village A, evaluate on unseen days 1000–1019, then run
+village B days 1–5 with village A's federated brain versus an empty one. Report
+first-attempt verified pass rate, attempts and model calls to a verified plan,
+relaxations, wood meals, max delay, SMS checker block rate, parser fallback rate, tokens
+per day, brief and store size, stale entries served (must be 0), and notes admitted,
+rejected and superseded.
 
 ## Metrics (per day; report mean and worst day, overall and per weather class)
 
@@ -70,7 +85,8 @@ verify-and-relax loop buys. A `--no-federation` flag runs `agents` without lesso
 ## Protocol
 
 1. Same households, same unseen days and same random draws for every policy.
-2. Mock mode for all 20 days; live Nemotron for 3 of them (milestone 9). Results say which.
+2. Mock mode for all 20 days; live Nemotron for 3 of them, brain on and off (milestone 8).
+   Results say which.
 3. Success for the project: on unseen days, `agents` has zero overload minutes and zero
    tier-1 outage on every day, fewer wood meals than `fcfs`, and never reports `DONE` on a
    day where a condition failed in execution. Anything short of that is reported as it is.
