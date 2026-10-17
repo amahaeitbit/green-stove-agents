@@ -13,7 +13,7 @@ merged C0 world. No live Nemotron call has run yet; the remaining work is live e
 | Workstream | What it delivers | Status | Proof |
 | --- | --- | --- | --- |
 | B1 Model path | Crusoe client: catalog-driven Nemotron ids, budgets, structured output, caching, cost | Built · live pending key | `gsa preflight --mode live`, `gsa smoke --mode live` |
-| B2 Bounded planning | Pricing Agent + Supervisor: 3 attempts, honest stops, no relaxation | Built | `gsa run --condition A` |
+| B2 Bounded planning | Spec Agent's definition of done; Pricing Agent + Supervisor: 3 attempts, loop and drift detection, decision trail, no relaxation | Built | `gsa spec`, `gsa run --condition A` |
 | B3 Shared Brain | Note-writer → Keeper → approved memory → 600-token briefs; stats and provenance | Built | `gsa brain stats`, `gsa brain explain <id>`, `gsa brain audit` |
 | B4 Handoff and evaluation | Fresh agent per day; frozen memory; A/B/C on held-out days; demo | Built · live pending | `gsa eval-agents`, `gsa demo` |
 | B5 Extensions | You.com forecast, Version N+1, always-on runner + NemoClaw kit, decision record | Built · outside the headline claim | `gsa forecast`, `gsa evolve`, `gsa runner` |
@@ -70,9 +70,20 @@ edited. Grey: Person B's code. Yellow: Crusoe.
 
 ## B2. Bounded planning: Done Means Done
 
-**Goal.** A fresh Pricing Agent proposes three lattice prices; code decides everything else.
+**Goal.** Turn a one-line goal into checks the agents run without a human; a fresh Pricing
+Agent proposes three lattice prices; code decides everything else.
 
-**Delivered.** `pricing_agent.py`, `supervisor.py`, `decision.py`:
+**Delivered.** `spec_agent.py`, `pricing_agent.py`, `supervisor.py`, `decision.py`:
+- Spec Agent writes the definition of done from the one-line goal using only metrics the verifier
+  computes; code drops unknown metrics, fixes directions, adds missing committee checks
+  (`code_added`) and tightens looser ones (`code_tightened`), so "done" can only get stricter;
+  cached per goal, committee and model and frozen for A/B/C (`gsa spec`)
+- the Supervisor scores every attempt; an attempt worse than the best so far sends a drift
+  warning back to the agent, two worse attempts in a row stop the day ("drifting"); a repeated
+  tariff stops it ("looping")
+- every run records its decisions: continue (dispatch a verified plan), re-plan (new candidate
+  from verifier feedback), stop (looping, drifting, budget, infeasible, model error) and, rarely,
+  ping_human (infeasible day or no verified plan on a feasible day)
 - the agent sees forecasts only, never actual weather; prices must be in the lattice and tier order
 - at most 3 attempts; feedback is the verifier's codes, intervals and values
 - stops honestly: `PLAN_VERIFIED`, `NO_VERIFIED_PLAN` (budget or repeated proposal),

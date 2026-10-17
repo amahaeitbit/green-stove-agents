@@ -59,8 +59,9 @@ Abel's results table between the handoff and infeasible scenes.
 
 | Time | Scene | Speaker | Say |
 | --- | --- | --- | --- |
-| 0:00–0:25 | `world` | Abel | Households differ in power, duration, window, budget and whether they auto-book; the station has fixed limits |
-| 0:25–0:55 | `proposal` | Partner | A fresh Pricing Agent on Crusoe proposes prices; code allocates and verifies on expected and downside forecasts; one attempt fails with named codes, the next passes; reservations are capacity-backed |
+| 0:00–0:10 | `goal` | Partner | One line of goal; the Spec Agent turned it into checks the agents run without us; code tightened one and added one |
+| 0:10–0:25 | `world` | Abel | Households differ in power, duration, window, budget and whether they auto-book; the station has fixed limits |
+| 0:25–0:55 | `proposal` | Partner | A fresh Pricing Agent on Crusoe proposes prices; code allocates and verifies on expected and downside forecasts; failures come back with named codes; the decision trail reads re-plan → re-plan → continue; reservations are capacity-backed |
 | 0:55–1:25 | `memory` | Partner | The Note-writer proposes observations; the Keeper rebuilds facts from evidence ids and admits them; a fabricated note is rejected for an unsupported number |
 | 1:25–1:55 | `handoff` | Partner | A new agent on a different scenario reads the brief (entry ids shown), cites entries and is verified; brain off on the same scenario for contrast; one example, not the evidence |
 | 1:55–2:30 | results *(Abel)* | Abel | All six conditions on held-out days, including nearest reuse and search, with service and effort |

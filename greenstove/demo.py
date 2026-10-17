@@ -56,6 +56,9 @@ def show_run(c: Console, ctx: ScenarioContext, run: RunRecord, env: Environment,
         t.add_row(str(a.n), prices, ",".join(a.proposal.cited_observation_ids) if a.proposal else "",
                   verdict[0], verdict[1], escape(", ".join(a.feedback or a.validation_errors)[:60]))
     c.print(t)
+    if run.decisions:
+        c.print("decisions: " + " → ".join(f"{d.decision}" for d in run.decisions)
+                + f"  ({escape(run.decisions[-1].reason)})")
     tokens = sum(x.prompt_tokens + x.completion_tokens for x in run.calls)
     style = "green" if run.status == "PLAN_VERIFIED" else "red"
     c.print(f"[bold {style}]{run.status}[/] — {run.reason} · model calls {len(run.calls)} · tokens {tokens} · "
@@ -85,6 +88,16 @@ def show_run(c: Console, ctx: ScenarioContext, run: RunRecord, env: Environment,
                     f"  min {min(trace.battery_kwh):.2f} kWh")
         else:
             c.print("battery: not modeled by this world")
+
+
+def show_spec(c: Console, dod) -> None:
+    c.print(Panel(escape(dod.goal), title="One-line goal"))
+    t = Table("check the agents will run without you", "source", "why", title=f"Definition of done · spec {dod.spec_hash()[:8]}")
+    for ch in dod.checks:
+        color = {"agent": "cyan", "code_added": "yellow", "code_tightened": "magenta"}[ch.source]
+        t.add_row(f"{ch.metric} {ch.op} {ch.threshold:g}", f"[{color}]{ch.source}[/]", escape(ch.why))
+    c.print(t)
+    c.print("[dim]The Spec Agent writes the checks; code may tighten them, never loosen them.[/]")
 
 
 def show_notes(c: Console, run: RunRecord) -> None:
@@ -128,22 +141,26 @@ def main(a) -> int:
         evidence, brain = EvidenceStore(work / "evidence"), BrainStore(work / "brain")
         c.print(f"memory: fresh demo workspace {work.relative_to(cli.ROOT)}")
     req = DEFAULT_REQUIREMENTS
+    dod = cli.current_spec(llm, req)
+    eff = dod.requirements(req)
     scenarios = {**DEV_SCENARIOS, **DEMO_SCENARIOS}
     pick = lambda name, pool: name if name in scenarios else next(iter(pool))  # noqa: E731
     pctx = cli.context_for(pick(PROPOSAL_SCENARIO, DEV_SCENARIOS))
     hctx = cli.context_for(pick(HANDOFF_SCENARIO, DEMO_SCENARIOS))
-    scenes = ["world", "proposal", "memory", "handoff", "infeasible"] if a.scene == "all" else [a.scene]
+    scenes = ["goal", "world", "proposal", "memory", "handoff", "infeasible"] if a.scene == "all" else [a.scene]
     run = None
     for scene in scenes:
         c.rule(f"[bold]{scene}")
-        if scene == "world":
+        if scene == "goal":
+            show_spec(c, dod)
+        elif scene == "world":
             show_world(c, pctx)
         elif scene in ("proposal", "memory"):
             if run is None:
                 run = supervisor.run_agent_day(pctx, "off", req, env=env, llm=llm, evidence=evidence, brain=brain,
-                                               actual=make_actual(pctx, seed=pctx.day + 7))
+                                               actual=make_actual(pctx, seed=pctx.day + 7), dod=dod)
             if scene == "proposal":
-                show_run(c, pctx, run, env, req)
+                show_run(c, pctx, run, env, eff)
             else:
                 show_notes(c, run)
                 recs = [e for e in evidence.all() if e.agent_run_id == run.agent_run_id
@@ -161,10 +178,10 @@ def main(a) -> int:
             rows = []
             for mode in ("off", "curated"):
                 r = supervisor.run_agent_day(hctx, mode, req, env=env, llm=llm, evidence=evidence, brain=brain,
-                                             write_notes=False)
+                                             write_notes=False, dod=dod)
                 rows.append((mode, r))
                 if mode == "curated":
-                    show_run(c, hctx, r, env, req)
+                    show_run(c, hctx, r, env, eff)
             t = Table("fresh agent", "brief entries", "attempts", "model calls", "tokens", "status")
             for mode, r in rows:
                 t.add_row(mode, ",".join(r.brief.entry_ids) or "-", str(len(r.attempts)), str(len(r.calls)),
@@ -173,7 +190,7 @@ def main(a) -> int:
             c.print("[dim]One illustrative scenario; the held-out table is the evidence.[/]")
         elif scene == "infeasible":
             ictx = infeasible_context()
-            r = supervisor.run_agent_day(ictx, "curated", req, env=env, llm=llm, evidence=evidence, brain=brain)
+            r = supervisor.run_agent_day(ictx, "curated", req, env=env, llm=llm, evidence=evidence, brain=brain, dod=dod)
             p = r.infeasibility or {}
             c.print(f"[bold]{r.status}[/] — needs ≥ {p.get('lower_bound_kwh', 0):.2f} kWh, at most "
                     f"{p.get('available_kwh', 0):.2f} kWh available · model calls {len(r.calls)}")

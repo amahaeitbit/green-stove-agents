@@ -80,6 +80,14 @@ def render_decision(ctx: ScenarioContext, run: RunRecord, env: Environment, req:
         for a in failed:
             prices = " ".join(f"{k}={v:g}" for k, v in sorted(a.proposal.prices.items())) if a.proposal else "invalid"
             out += [f"- attempt {a.n}: {prices} → {', '.join(a.feedback or a.validation_errors)}"]
+    if run.definition_of_done:
+        d = run.definition_of_done
+        out += ["", f"## Definition of done (spec {d['spec_hash'][:8]})", "", f"Goal: {d['goal']}", "",
+                "| Check | Source |", "| --- | --- |"]
+        out += [f"| {c['metric']} {c['op']} {c['threshold']:g} | {c['source']} |" for c in d["checks"]]
+    if run.decisions:
+        out += ["", "## Decisions", ""]
+        out += [f"- attempt {x.attempt}: **{x.decision}**: {x.reason}" for x in run.decisions]
     tokens = sum(c.prompt_tokens + c.completion_tokens for c in run.calls)
     out += ["", "## Cost and provenance", "",
             f"Model calls {len(run.calls)} · tokens {tokens} · candidate checks {run.candidate_evaluations} · "

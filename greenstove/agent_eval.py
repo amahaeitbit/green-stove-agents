@@ -64,7 +64,7 @@ def stale_served(run: RunRecord, brain: BrainStore, history_ids: set[str], clock
 
 def run_conditions(names: list[str], contexts: Callable, actuals: Callable, requirements: Requirements, *,
                    env: Environment, llm: LLMClient, freeze_dir: Path, out: Path,
-                   modes: tuple[str, ...] = MODES, log: Callable[[str], None] = print) -> list[RunRecord]:
+                   modes: tuple[str, ...] = MODES, log: Callable[[str], None] = print, dod=None) -> list[RunRecord]:
     brain, history = load_frozen(freeze_dir)
     history_ids = {r.run_id for r in history}
     evidence = EvidenceStore(out / "evidence")           # evaluation evidence never feeds memory
@@ -76,7 +76,7 @@ def run_conditions(names: list[str], contexts: Callable, actuals: Callable, requ
             for mode in order:
                 run = supervisor.run_agent_day(ctx, mode, requirements, env=env, llm=llm, evidence=evidence,
                                                brain=brain, history=history, phase="evaluation",
-                                               actual=actual, write_notes=False)
+                                               actual=actual, write_notes=False, dod=dod)
                 stale = stale_served(run, brain, history_ids, ctx.day, ctx.config_hash)
                 f.write(json.dumps({"scenario": name, "mode": mode, "stale_served": stale,
                                     "run": run.model_dump(mode="json")}) + "\n")
@@ -129,8 +129,11 @@ def summarize(runs: list[RunRecord], out: Path, header: dict[str, Any]) -> str:
 
 
 def manifest_fragment(freeze_info: dict, names: list[str], requirements: Requirements, llm: LLMClient,
-                      env: Environment, config_hash: str, max_attempts: int = 3, brief_budget: int = 600) -> dict:
+                      env: Environment, config_hash: str, max_attempts: int = 3, brief_budget: int = 600,
+                      dod=None) -> dict:
     return {"partner": {
+        "definition_of_done": ({"spec_hash": dod.spec_hash(), "goal": dod.goal,
+                                "checks": [c.model_dump() for c in dod.checks]} if dod else None),
         "commit": git_commit(),
         "llm": {"mode": llm.s.mode, **llm.s.public(),
                 "models_by_role": {r: llm.s.model_for(r) for r in ("pricing", "note_writer", "forecast_extractor")},

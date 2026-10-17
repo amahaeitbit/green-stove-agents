@@ -44,6 +44,36 @@ def make_llm(mode: str | None) -> LLMClient:
 CONDITIONS = {"A": "off", "B": "history", "C": "curated"}
 
 
+def goal_text(goal: str | None = None) -> str:
+    from greenstove.spec_agent import DEFAULT_GOAL
+    return goal or os.environ.get("GREENSTOVE_GOAL") or DEFAULT_GOAL
+
+
+def current_spec(llm: LLMClient, requirements, goal: str | None = None, refresh: bool = False):
+    """The definition of done for this goal + committee + model (cached; frozen for A/B/C)."""
+    from greenstove.spec_agent import write_spec
+    return write_spec(goal_text(goal), requirements, llm, cache_dir=data_dir() / "spec", refresh=refresh)
+
+
+def cmd_spec(a) -> int:
+    from greenstove.scenarios import DEFAULT_REQUIREMENTS
+    llm = make_llm(a.mode)
+    dod = current_spec(llm, DEFAULT_REQUIREMENTS, a.goal, refresh=a.refresh)
+    llm_calls = len(llm.calls)
+    console.print(f"[bold]Goal:[/] {dod.goal}")
+    if dod.goal_restated:
+        console.print(f"Spec Agent restated: {dod.goal_restated}", markup=False)
+    t = Table("metric", "check", "source", "why", title=f"Definition of done · spec {dod.spec_hash()[:8]} · {dod.model}")
+    for c in dod.checks:
+        color = {"agent": "cyan", "code_added": "yellow", "code_tightened": "magenta"}[c.source]
+        t.add_row(c.metric, f"{c.op} {c.threshold:g}", f"[{color}]{c.source}[/]", escape(c.why))
+    console.print(t)
+    for d in dod.dropped:
+        console.print(f"dropped: {d}", markup=False)
+    console.print(f"model calls: {llm_calls} (0 means cached) · code may tighten the agent's checks, never loosen them")
+    return 0
+
+
 def cmd_decide(a) -> int:
     """The day's full decision record for operators (runs one agent day, then prints decision.md)."""
     a.brain = CONDITIONS[a.condition]
@@ -138,11 +168,13 @@ def cmd_plan(a) -> int:
     if a.scenario == "c0-fixture":                # Abel's fixture comes with its own requirements
         from greenstove.io import load_requirements
         req = load_requirements(ROOT / "fixtures" / "c0" / "requirements.json")
+    dod = None if getattr(a, "no_spec", False) else current_spec(llm, req)
     run = supervisor.run_agent_day(ctx, a.brain, req, env=env, llm=llm,
-                                   evidence=evidence, brain=brain, actual=actual)
-    show_run(console, ctx, run, env, req)
+                                   evidence=evidence, brain=brain, actual=actual, dod=dod)
+    eff = dod.requirements(req) if dod else req
+    show_run(console, ctx, run, env, eff)
     from greenstove.decision import brief_lines, render_decision
-    text = render_decision(ctx, run, env, req, brief_lines(run.brief.text))
+    text = render_decision(ctx, run, env, eff, brief_lines(run.brief.text))
     path = evidence.run_dir(run.agent_run_id) / "decision.md"
     path.write_text(text)
     if getattr(a, "show_decision", False):
@@ -158,10 +190,11 @@ def cmd_warmup(a) -> int:
     llm, env = make_llm(a.mode), load_environment(prefer_stub=a.stub)
     banner(llm, env.name)
     evidence, brain = stores()
+    dod = current_spec(llm, DEFAULT_REQUIREMENTS)
     for name in DEV_SCENARIOS:
         ctx = context_for(name)
         run = supervisor.run_agent_day(ctx, "curated", DEFAULT_REQUIREMENTS, env=env, llm=llm, evidence=evidence,
-                                       brain=brain, actual=make_actual(ctx, seed=ctx.day + 7))
+                                       brain=brain, actual=make_actual(ctx, seed=ctx.day + 7), dod=dod)
         notes = ", ".join(f"{n.action}:{n.observation_id or '-'}" for n in run.notes)
         console.print(f"{name:32} {run.status:17} attempts={len(run.attempts)} calls={len(run.calls)} notes=[{notes}]",
                       markup=False)
@@ -346,14 +379,16 @@ def cmd_eval_agents(a) -> int:
     out.mkdir(parents=True, exist_ok=True)
     freeze_dir = Path(a.freeze)
     info = json.loads((freeze_dir / "freeze.json").read_text())
+    dod = current_spec(llm, scenarios.DEFAULT_REQUIREMENTS)          # frozen: same for A, B and C
     runs = agent_eval.run_conditions(names, scenarios.scenario, scenarios.actual_for, scenarios.DEFAULT_REQUIREMENTS,
                                      env=env, llm=llm, freeze_dir=freeze_dir, out=out,
-                                     log=lambda s: console.print(s, markup=False))
+                                     log=lambda s: console.print(s, markup=False), dod=dod)
     header = {"model": llm.s.public()["model"] if llm.s.mode == "crusoe" else "mock-rules (MOCK)",
               "world": env.name, "commit": agent_eval.git_commit(), "brain_snapshot": info["brain_snapshot"],
               "days": len(names)}
     console.print(agent_eval.summarize(runs, out, header), markup=False)
-    frag = agent_eval.manifest_fragment(info, names, scenarios.DEFAULT_REQUIREMENTS, llm, env, scenarios.config_hash())
+    frag = agent_eval.manifest_fragment(info, names, scenarios.DEFAULT_REQUIREMENTS, llm, env, scenarios.config_hash(),
+                                        dod=dod)
     (out / "manifest-partner.json").write_text(json.dumps(frag, indent=2))
     console.print(f"records: {out.relative_to(ROOT) if out.is_relative_to(ROOT) else out}")
     return 0
@@ -372,6 +407,7 @@ def cmd_e2e(a) -> int:
     steps = [  # (name, argv, required, what it shows)
         ("preflight", ["preflight"] + mode, False, "readiness: keys, spend flag, model id, world, tests"),
         ("smoke", ["smoke"] + mode, True, "one structured Crusoe call recorded"),
+        ("spec", ["spec"] + mode, True, "Done Means Done: one-line goal -> definition of done"),
         ("models", ["models"], False, "Crusoe catalog: exact Nemotron ids and pricing") if live else None,
         ("bench", ["bench", "--n", "2"] + mode, False, "Nemotron model chosen by measurement"),
         ("forecast", ["forecast", "--date", day] + mode, False, "You.com + Nemotron forecast -> solar profile"),
@@ -441,6 +477,7 @@ def main(argv: list[str] | None = None) -> int:
                                                                 choices=["off", "history", "curated"])
     s.add_argument("--execute", action="store_true"); s.add_argument("--mode", choices=["mock", "live", "crusoe"])
     s.add_argument("--stub", action="store_true"); s.add_argument("--forecast", help="saved forecast record (gsa forecast)")
+    s.add_argument("--no-spec", action="store_true", help="skip the Spec Agent (committee requirements only)")
     s.set_defaults(fn=cmd_plan)
     s = sub.add_parser("warmup"); s.add_argument("--mode", choices=["mock", "live", "crusoe"])
     s.add_argument("--stub", action="store_true"); s.set_defaults(fn=cmd_warmup)
@@ -450,7 +487,7 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--out", default="data/brain-frozen"); s.add_argument("--limit", type=int, default=30)
     s.set_defaults(fn=cmd_brain)
     s = sub.add_parser("demo")
-    s.add_argument("--scene", default="all", choices=["all", "world", "proposal", "memory", "handoff", "infeasible"])
+    s.add_argument("--scene", default="all", choices=["all", "goal", "world", "proposal", "memory", "handoff", "infeasible"])
     s.add_argument("--mode", choices=["mock", "live", "crusoe"]); s.add_argument("--stub", action="store_true")
     s.add_argument("--replay", help="print a recorded demo transcript (labeled RECORDED)")
     s.add_argument("--pause", action="store_true", help="wait for Enter between scenes")
@@ -461,6 +498,9 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--scenario", default="demo-handoff-overcast")
     s.add_argument("--mode", choices=["mock", "live", "crusoe"]); s.add_argument("--stub", action="store_true")
     s.add_argument("--forecast", help="saved forecast record (gsa forecast)"); s.set_defaults(fn=cmd_run)
+    s = sub.add_parser("spec", help="Spec Agent: one-line goal -> definition of done (code may only tighten)")
+    s.add_argument("--goal"); s.add_argument("--refresh", action="store_true")
+    s.add_argument("--mode", choices=["mock", "live", "crusoe"]); s.set_defaults(fn=cmd_spec)
     s = sub.add_parser("decide", help="run one day and print the operator decision record")
     s.add_argument("--condition", choices=list(CONDITIONS), default="C")
     s.add_argument("--scenario", default="demo-handoff-overcast")

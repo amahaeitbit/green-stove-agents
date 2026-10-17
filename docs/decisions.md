@@ -93,3 +93,13 @@ gsa forecast --place "Asmara, Eritrea" --lat 15.3229 --lon 38.9251 --date 2026-1
 - A forecast supports an input assumption; it does not calibrate or validate the simulator.
 - Only the place and date go to web search; no household data.
 - Default site is a placeholder (Asmara); set the pilot's real coordinates with `--lat/--lon`.
+
+## Spec Agent (Done Means Done)
+
+PLAN.md says a Spec Agent is unnecessary for the Shared Brain MVP and that no relaxation can
+turn a failed headline case into success. The event's Done Means Done track asks agents to
+write their own definition of done, so the partner added one under Abel's rule: the agent's
+checks are validated against the verifier's metric vocabulary and can only be stricter than
+the committee's requirements (`code_tightened`, `code_added`). The definition is cached per
+goal + committee + model and frozen into `manifest-partner.json`, so A, B and C use the same
+one. `gsa run --no-spec` reproduces committee-only behavior. Abel to confirm.
