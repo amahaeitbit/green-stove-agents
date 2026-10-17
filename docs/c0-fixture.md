@@ -8,6 +8,28 @@ Built at the hackathon on 2026-10-17. Deterministic, no LLM.
 `greenstove/env_protocol.py` (branch `agents-memory`), so the agent layer can import these types
 instead of its copies. The additions on top come from the C0 code review and are listed below.
 
+## Operating model confirmed by Abel
+
+Cooking happens **at home**. Each household has access to its own cooking appliance and
+is connected to one local mini-grid. In this fixture, "station" means the mini-grid's
+shared generation/storage and aggregate inverter boundary, not a communal cooking site.
+
+A reservation books electrical capacity for a household's cooking session. Different
+homes may cook simultaneously when their combined demand fits the shared limits; the
+allocator does not need a shared-cooker availability check. Household agents submit needs
+and accept offers; the local coordinator confirms capacity and code enforces modeled limits.
+
+The MVP models cooking as the only household demand. C0 has no essential/background load;
+a later increment may add an explicitly configured essential load. Calendar-derived
+availability is represented by synthetic time windows, with no calendar integration.
+Accepted bookings are assumed to be followed in the simulation. They do not establish
+physical control over household appliances. Distribution losses, voltage/phase effects,
+and individual household connection limits are omitted initially and must be disclosed.
+
+Decentralized deployment means multiple local mini-grids could each run their own
+coordinator. This build models one; cross-grid trading, federation and coordination are
+outside the MVP. These clarifications require no C0 fixture, schema or arithmetic changes.
+
 ## Run it
 
 ```
