@@ -89,6 +89,15 @@ Does curated shared experience reduce planning effort at comparable service, rel
 
 The baselines get the same current facts, household behavior, resource checks and action lattice. Evaluation memory is frozen. Count simulator evaluations, latency, cost, completed meals and violations, not just LLM calls. Report a negative result if reuse/search performs better.
 
+## Interactive UI
+
+`.venv/bin/gsa ui` starts a local page at http://127.0.0.1:8765 (this machine only) with four
+panels: play a household and ask its household agent, run the Green-Stove agent on any scenario
+and memory mode, explore and test the Shared Brain (offer a note to the Keeper), and use the
+sponsor tools (Crusoe model catalog and usage, a You.com forecast the agents can plan on, the
+NemoClaw guardrail check and always-on runner events). `gsa replay` writes a static HTML replay of
+a recorded demo run.
+
 ## Run it (agent layer, branch `agents-memory`)
 
 ```bash

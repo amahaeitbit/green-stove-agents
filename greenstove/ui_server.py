@@ -179,7 +179,8 @@ class Session:
 
     def state(self) -> dict[str, Any]:
         with self.lock:
-            return {"mode": self.llm.s.mode, "model": self.llm.s.model, "world": self.env.name,
+            model = self.llm.s.model if self.llm.s.mode == "crusoe" else f"mock-rules (live: {self.llm.s.model})"
+            return {"mode": self.llm.s.mode, "model": model, "world": self.env.name,
                     "session": self.stamp,
                     "scenarios": [{"name": n, "weather_class": s[1], "battery_frac": s[2], "day": s[5]}
                                   for n, s in SCENARIOS.items()],

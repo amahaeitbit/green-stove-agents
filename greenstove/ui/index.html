@@ -340,7 +340,7 @@ function fmtAny(v){
   if(typeof v==='object')return Object.keys(v).map(k=>k+': '+fmtAny(v[k])).join(' · ');
   return String(v);
 }
-function money(v){return typeof v==='number'?'$'+v.toFixed(2):fmtAny(v);}
+function money(v){return typeof v==='number'?v.toFixed(2):fmtAny(v);}   /* scenario currency units, not USD */
 function pct(v){return typeof v==='number'?(v<=1?Math.round(v*100):Math.round(v))+'%':fmtAny(v);}
 function label(k){return String(k).replace(/_/g,' ');}
 function fmtPrices(p){
@@ -662,7 +662,7 @@ function renderBrainStats(){
   for(const k of Object.keys(stats)){const v=stats[k];
     if(v!=null&&typeof v==='object'){extra.push(el('div',{class:'small'},el('span',{class:'muted',text:label(k)+': '}),
       Array.isArray(v)?el('span',{text:fmtAny(v)}):el('span',{class:'chips',style:'display:inline-flex'},Object.keys(v).length?Object.keys(v).map(c=>chip(c+' ×'+fmtAny(v[c]),/reject/i.test(k)?'bad':'')):chip('none'))));}
-    else tiles.push(stat(label(k),/rate|frac|share/i.test(k)?pct(v):fmtAny(v)));}
+    else tiles.push(stat(label(k),/(^|_)(rate|fraction|frac|share|hit)($|_)/i.test(k)?pct(v):fmtAny(v)));}
   fill(box,el('div',{class:'stat-row'},tiles),extra);
 }
 function renderEntries(){
