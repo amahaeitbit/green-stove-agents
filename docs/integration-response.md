@@ -52,3 +52,9 @@ All runs are mock-model runs (labeled MOCK everywhere); no live Crusoe key yet.
 2. Decide on the opt-in re-offer (keep off, or approve).
 3. `execute_day` when ready; A5 fixture; BatterySpec in your station config.
 4. Sign `docs/checkpoints.md` with Isaac; then merge to `main`.
+
+## Merge to main
+
+Merged `agents-memory` into `main` on 2026-10-17 at about 15:40 PT at Isaac's direction (Isaac
+reports that Abel agreed). The `docs/checkpoints.md` sign-off lines are still for both of you to
+fill in; they were not signed on anyone's behalf.
