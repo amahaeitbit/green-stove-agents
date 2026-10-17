@@ -177,7 +177,19 @@ def run_agent_day(context: ScenarioContext, memory_mode: MemoryMode, requirement
         _write_notes(rec, run_records, context, brain, evidence, llm, phase, write_notes, brief_budget, keeper_ttl_days)
     rec.calls = list(llm.calls)
     evidence.save_run(rec)
+    _write_decision(rec, context, env, requirements, evidence)
     return rec
+
+
+def _write_decision(rec: RunRecord, context: ScenarioContext, env: Environment, requirements: Requirements,
+                    evidence: EvidenceStore) -> None:
+    """decision.md for every run (warm-up, runner, evaluation, CLI); never breaks the run."""
+    from greenstove.decision import brief_lines, render_decision
+    try:
+        text = render_decision(context, rec, env, requirements, brief_lines(rec.brief.text))
+    except Exception as exc:  # noqa: BLE001 - the record is a convenience, the run record is the truth
+        text = f"# Day decision · {context.scenario_id}\n\nDecision record unavailable: {exc.__class__.__name__}.\n"
+    (evidence.run_dir(rec.agent_run_id) / "decision.md").write_text(text)
 
 
 def _write_notes(rec: RunRecord, run_records: list[EvidenceRecord], context: ScenarioContext,

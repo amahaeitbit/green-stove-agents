@@ -206,17 +206,18 @@ def _filled_brain(ev, brain, n=6):
 def test_brief_budget_ranking_and_determinism(ev, brain):
     entries = _filled_brain(ev, brain)
     query = {**SIT, "battery_frac": 0.62}                  # nearest is obs-005 (0.62)
-    small = compile_brief("pricing", query, entries, 90, config_hash=CFG, clock=10)
-    assert small.tokens <= 90 and small.tokens == estimate_tokens(small.text)
+    small = compile_brief("pricing", query, entries, 140, config_hash=CFG, clock=10)
+    assert small.tokens <= 140 and small.tokens == estimate_tokens(small.text)
     assert 0 < len(small.entry_ids) < 6 and small.entry_ids[0] == "obs-005"
     assert all(i in small.text for i in small.entry_ids)
     assert small.text.startswith(f"SHARED BRAIN (curated, snapshot {brain.snapshot_hash()[:8]})")
-    again = compile_brief("pricing", query, list(reversed(entries)), 90, config_hash=CFG, clock=10)
+    again = compile_brief("pricing", query, list(reversed(entries)), 140, config_hash=CFG, clock=10)
     assert again == small
     full = compile_brief("pricing", query, entries, config_hash=CFG, clock=10)
     assert len(full.entry_ids) == 6 and full.versions == {e.id: 1 for e in entries}
     assert "obs-005 v1 | cloudy batt=0.62 demand=6.5kWh pv=9.8kWh flex=2.0h | prices sun=4 standard=8 peak=14" \
-        " | forecast FAIL BATTERY_RESERVE | evidence 1 run" in full.text
+        " | forecast FAIL BATTERY_RESERVE | - | evidence 1 run" in full.text
+    assert "Prefer prices that PASSED" in full.text           # usage hint for the agent
 
 
 def test_history_brief_filters_and_orders(ev):
@@ -247,3 +248,15 @@ def test_structured_claim_checked_and_first_stage_code(ev, brain):
                 ev, kcfg(10), brain)
     assert res.action == "added" and res.code is None
     assert (tmp := brain.root / "approved.jsonl").exists() and len(tmp.read_text().splitlines()) == 1
+
+
+def test_insight_stats_and_explain(ev, brain):
+    from greenstove.brain import insight
+    add(ev, rec("r1"), rec("r2", agent_run="ar-2"))
+    admit(note(["r1"]), ev, kcfg(10), brain)
+    admit(note(["r9"]), ev, kcfg(10), brain)                       # rejected: unknown evidence
+    s = insight.stats(brain, ev)
+    assert s["entries"]["current"] == 1 and s["rejections_by_code"] == {"evidence_unknown": 1}
+    info = insight.explain("obs-001", brain, ev)
+    assert info["evidence"][0]["id"] == "r1" and info["keeper_events"][0]["action"] == "added"
+    assert insight.explain("obs-999", brain, ev) is None

@@ -14,7 +14,7 @@ merged C0 world. No live Nemotron call has run yet; the remaining work is live e
 | --- | --- | --- | --- |
 | B1 Model path | Crusoe client: catalog-driven Nemotron ids, budgets, structured output, caching, cost | Built · live pending key | `gsa preflight --mode live`, `gsa smoke --mode live` |
 | B2 Bounded planning | Pricing Agent + Supervisor: 3 attempts, honest stops, no relaxation | Built | `gsa run --condition A` |
-| B3 Shared Brain | Note-writer → Keeper → approved memory → 600-token briefs | Built | `gsa brain show`, `gsa brain audit` |
+| B3 Shared Brain | Note-writer → Keeper → approved memory → 600-token briefs; stats and provenance | Built | `gsa brain stats`, `gsa brain explain <id>`, `gsa brain audit` |
 | B4 Handoff and evaluation | Fresh agent per day; frozen memory; A/B/C on held-out days; demo | Built · live pending | `gsa eval-agents`, `gsa demo` |
 | B5 Extensions | You.com forecast, Version N+1, always-on runner + NemoClaw kit, decision record | Built · outside the headline claim | `gsa forecast`, `gsa evolve`, `gsa runner` |
 | End to end | Every step in one command, one folder, one summary | Built (14/14 in mock) | `gsa e2e [--mode live]` |
@@ -98,7 +98,13 @@ and failed checks lead to a new candidate or a reason-coded stop.
   stay as separate scoped entries (recency is not proof); a forecast pass needs both forecasts
 - store: at most 20 entries, successes and failures, expiry on an explicit simulated clock,
   audit log that is never served, frozen snapshots with a verified hash
-- briefs: deterministic situation match, 600-token budget, ids and versions logged as supplied
+- briefs: deterministic situation match, 600-token budget, ids and versions logged as supplied;
+  each entry shows its outcome (served share, lowest battery, largest shift) and confirmations,
+  with a one-line usage hint for the agent
+- `gsa brain stats`: current / expired / superseded entries, pass/fail split, conflict groups,
+  confirmations, rejections by Keeper code, entries supplied per brief, citation rate, most-cited entries
+- `gsa brain explain <id>`: evidence the Keeper rebuilt the entry from, source runs and their
+  decision records, Keeper decisions, and every later fresh agent that read it (cited or not, outcome)
 
 **Gate (C3).** A supported note is admitted, a fabricated one rejected, a stale or
 incompatible one excluded, and a fresh agent reads the recorded brief.

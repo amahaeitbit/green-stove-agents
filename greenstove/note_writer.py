@@ -73,7 +73,7 @@ def mock_note_writer(payload: dict[str, Any]) -> dict[str, Any]:
         codes = sorted({c for e in chosen for c in e["feedback_codes"]})
         prices = " ".join(f"{k}={v:g}" for k, v in sorted(decisive["tariff"].items()))
         m = decisive["metrics"]
-        detail = f"min battery {m.get('min_battery_kwh', 0):g} kWh, served {m.get('served_fraction', 0):g}"
+        detail = f"min battery {m.get('min_battery_kwh', 0):.2f} kWh, served {m.get('served_fraction', 0):.2f}"
         verb = "passed" if passed else f"failed {', '.join(codes) or 'checks'}"
         notes.append({"evidence_ids": [e["evidence_id"] for e in chosen],
                       "situation_tags": _tags(decisive["situation"], passed, decisive["phase"], codes),

@@ -20,7 +20,9 @@ SCALES = {"battery_frac": 0.3, "demand_kwh": 0.3, "forecast_pv_kwh": 0.3, "flex_
 RELATIVE = {"demand_kwh", "forecast_pv_kwh"}
 MISSING_PENALTY = 1.0
 
-CURATED_LEGEND = "(id version | situation | prices | phase result codes | support; forecast != actual)"
+CURATED_LEGEND = "(id version | situation | prices | phase result codes | outcome | support; forecast != actual)"
+CURATED_HINT = ("Use: entries are closest situation first. Prefer prices that PASSED in a similar situation; "
+                "avoid or adjust prices that FAILED there, guided by their codes. Cite the ids you rely on.")
 HISTORY_LEGEND = "(run day phase scenario | situation | prices | result codes | metrics)"
 
 
@@ -63,9 +65,15 @@ def _prices_text(tariff: dict[str, float]) -> str:
 
 def render_observation(e: ApprovedObservation) -> str:
     runs = e.confirmations + 1
+    m = e.metrics
+    outcome = " ".join(x for x in (
+        f"served {m['served_fraction']:.2f}" if "served_fraction" in m else "",
+        f"min battery {m['min_battery_kwh']:.2f}kWh" if "min_battery_kwh" in m else "",
+        f"max shift {m['max_shift_hours']:.1f}h" if "max_shift_hours" in m else "") if x) or "-"
+    support = f"evidence {runs} run{'s' if runs != 1 else ''}" + (f", confirmed {e.confirmations}x" if e.confirmations else "")
     line = (f"{e.id} v{e.version} | {_situation_text(e.situation)} | prices {_prices_text(e.tariff)} | "
             f"{e.phase} {'PASS' if e.outcome_passed else 'FAIL'} {','.join(e.feedback_codes) or '-'} | "
-            f"evidence {runs} run{'s' if runs != 1 else ''}")
+            f"{outcome} | {support}")
     return line + (f" | conflict {e.conflict_group}" if e.conflict_group else "")
 
 
@@ -98,7 +106,7 @@ def compile_brief(role: str, situation: dict, store_entries: list[ApprovedObserv
     snap = snapshot_hash_of(store_entries)
     pool = sorted((e for e in store_entries if is_current(e, config_hash, clock)),
                   key=lambda e: (situation_distance(situation, e.situation), e.id))
-    head = [f"SHARED BRAIN (curated, snapshot {snap[:8]})", CURATED_LEGEND]
+    head = [f"SHARED BRAIN (curated, snapshot {snap[:8]})", CURATED_LEGEND, CURATED_HINT]
     text, n = _fill(head, [render_observation(e) for e in pool], token_budget,
                     "(no approved observations match this configuration)")
     chosen = pool[:n]

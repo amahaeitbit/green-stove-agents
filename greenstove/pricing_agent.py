@@ -12,16 +12,23 @@ from greenstove.agent_models import Brief, CallRecord, PricingOutput, TariffProp
 from greenstove.env_protocol import STEP_HOURS, ScenarioContext
 from greenstove.llm import LLMClient
 
-SYSTEM = """You are the Pricing Agent for a simulated community solar cooking station.
-Each day you choose one price per fixed tariff window so that household cooking demand
-fits the station: inverter power limit, battery reserve (the essential load must never go
-unserved), household budgets and the required share of served cooking sessions.
-Households pick the start that minimizes their cost plus inconvenience inside their own
-acceptable window, so cheaper windows attract demand. Rules you cannot change: the
-windows, the allowed price list for each window, the tier order (prices must be
-non-decreasing in tier_order), the requirements and household preferences.
-Use the shared memory brief (verified observations from earlier runs) and the feedback
-from earlier attempts today. Cite the ids of memory entries you actually relied on.
+SYSTEM = """You are the Pricing Agent for a simulated community solar mini-grid where
+households cook at home. Each day you set one price per fixed tariff window. Households
+then pick the start that minimizes their cost plus inconvenience inside their own
+acceptable window, so cheaper windows attract cooking. Code then books capacity and checks
+the plan on an expected and a cloudier downside forecast: inverter power limit, battery
+reserve (the essential load must never go unserved), household budgets, maximum shift and
+the required share of served sessions.
+You cannot change: the windows, each window's allowed prices, the tier order (prices must
+be non-decreasing along tier_order), the requirements, or household preferences.
+How to decide:
+1. Read the shared memory brief (verified results from earlier days, closest situation
+   first). Reuse prices that passed in a similar situation; avoid prices that failed there.
+2. Read earlier attempts today: each lists the checks that failed, where and by how much.
+   Change prices to fix those failures (for example, a cheaper sun window moves cooking
+   onto solar; a dearer peak window protects the evening battery; lower prices help budgets).
+3. Never repeat a tariff already tried today.
+Cite only memory ids that appear in the brief and that you actually relied on.
 Reply with ONLY a JSON object:
 {"prices": {"<window>": <price from that window's allowed list>, ...},
  "cited_observation_ids": ["obs-001", ...], "rationale": "<one or two sentences>"}"""
@@ -98,6 +105,8 @@ def propose(context: ScenarioContext, brief: Brief, feedback: list[dict[str, Any
                                             memory_hash=brief.snapshot_hash, attempt=attempt)
     if out is None:
         return None, [error or "invalid output"], records
+    names = {w.name.lower(): w.name for w in context.windows}           # tolerate "Sun" / " peak "
+    out.prices = {names.get(k.strip().lower(), k): v for k, v in out.prices.items()}
     errors = validate(out, context)
     if errors:
         return None, errors, records

@@ -165,7 +165,33 @@ def cmd_warmup(a) -> int:
 
 
 def cmd_brain(a) -> int:
-    _, brain = stores()
+    evidence, brain = stores()
+    if a.action in ("stats", "explain"):
+        from greenstove.brain import insight
+        if a.action == "stats":
+            data = insight.stats(brain, evidence)
+            t = Table("measure", "value", title=f"Shared Brain · snapshot {data.pop('snapshot')}")
+            for k, v in data.items():
+                t.add_row(k.replace("_", " "), escape(str(v)))
+            console.print(t)
+            return 0
+        if not a.id:
+            console.print("usage: gsa brain explain <obs-id>")
+            return 1
+        info = insight.explain(a.id, brain, evidence)
+        if info is None:
+            console.print(f"no entry {a.id}")
+            return 1
+        e = info["entry"]
+        console.print(f"{e['id']} v{e['version']} [{e['status']}] {e['phase']} {'PASS' if e['outcome_passed'] else 'FAIL'} "
+                      f"{e['tariff']} codes={e['feedback_codes']} days {e['created_at']}->{e['expires_at']} "
+                      f"confirmations={e['confirmations']} conflict={e['conflict_group']}", markup=False)
+        console.print(f"note (model words, not trusted facts): {e['description']}", markup=False)
+        _table(info["evidence"], title="evidence the Keeper rebuilt it from")
+        _table(info["source_runs"], title="source runs")
+        _table(info["keeper_events"], title="Keeper decisions")
+        _table(info["read_by_later_agents"], title="fresh agents that read it")
+        return 0
     if a.action == "freeze":
         dest = Path(a.out)
         brain.freeze(dest)
@@ -413,7 +439,9 @@ def main(argv: list[str] | None = None) -> int:
     s.set_defaults(fn=cmd_plan)
     s = sub.add_parser("warmup"); s.add_argument("--mode", choices=["mock", "live", "crusoe"])
     s.add_argument("--stub", action="store_true"); s.set_defaults(fn=cmd_warmup)
-    s = sub.add_parser("brain"); s.add_argument("action", choices=["show", "audit", "freeze"], nargs="?", default="show")
+    s = sub.add_parser("brain"); s.add_argument("action", choices=["show", "audit", "freeze", "stats", "explain"],
+                                                nargs="?", default="show")
+    s.add_argument("id", nargs="?", help="observation id for `brain explain`")
     s.add_argument("--out", default="data/brain-frozen"); s.add_argument("--limit", type=int, default=30)
     s.set_defaults(fn=cmd_brain)
     s = sub.add_parser("demo")

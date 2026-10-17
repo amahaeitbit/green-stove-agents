@@ -12,7 +12,7 @@ one-minute video. Segment owners follow [submission.md](submission.md). Commands
 | Nemotron (exact id from `/v1/models`) | The model behind both agent roles | printed in the banner of every command |
 | Crusoe catalog, benchmark, usage | Exact Nemotron ids and pricing; model chosen by measured valid outputs, latency and cost; total cost, cache hit rate and latency after the run | `gsa models`, `gsa bench --mode live`, `gsa usage` (see [crusoe.md](crusoe.md)) |
 | Terminal demo (`rich`) | World, attempts and verdicts, reservations, demand and battery strips, Keeper decisions, brief, fresh-agent comparison, infeasibility proof | `python -m greenstove demo` |
-| Shared Brain tools | Entries, versions, expiry, conflict groups; audit log of admissions and rejections | `brain show`, `brain audit` |
+| Shared Brain tools | Entries, versions, expiry, conflict groups; audit log; current/lean/conflict-free numbers and citation rate; full provenance of one entry | `brain show`, `brain audit`, `brain stats`, `brain explain <id>` |
 | Setup and readiness | Install, tests, mock smoke; PASS/WARN/FAIL table for key, spend flag, model id, world, brain, tests, git | `scripts/setup.sh`, `preflight` |
 | Weather + solar forecast (You.com + Nemotron) | Cited forecast for the site and date, verified quote, PV and downside profiles in kWh | `gsa forecast --mode live`, then `gsa decide --forecast <file>` |
 | Operator decision record | Today's tariff and why, memory relied on, both checks, bookings, who must confirm, rejected alternatives, cost | `gsa decide --scenario demo-handoff-overcast --condition C` |
@@ -23,7 +23,7 @@ one-minute video. Segment owners follow [submission.md](submission.md). Commands
 | Results table *(Abel)* | Held-out comparison of all six conditions | `docs/results.md` from `eval` |
 
 All commands run as `.venv/bin/gsa <command>` (or `.venv/bin/python -m greenstove <command>`) from the repo root.
-Q&A prop: `gsa decide` shows the full decision an operator would get for one day.
+Q&A props: `gsa decide` shows the full decision an operator would get for one day; `gsa brain explain obs-…` answers "how do you know this memory is true?"; `gsa brain stats` answers "is it current, lean and used?".
 
 ## T−30 minutes: preflight
 
