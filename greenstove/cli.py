@@ -519,7 +519,7 @@ def cmd_e2e(a) -> int:
 def _subcommands() -> set[str]:
     p = argparse.ArgumentParser()
     sub = p.add_subparsers(dest="cmd")
-    for optional in ("runner", "comparators", "results", "acceptance", "replay"):
+    for optional in ("runner", "comparators", "results", "acceptance", "replay", "ui_server"):
         try:
             __import__(f"greenstove.{optional}", fromlist=["register"]).register(sub)
         except ImportError:
@@ -599,7 +599,7 @@ def main(argv: list[str] | None = None) -> int:
     from greenstove import evolve, tracks
     evolve.register(sub)                          # playbook show|history|before-after, evolve (Version N+1)
     tracks.register(sub)                          # tracks: requirement-by-requirement scorecard for the 3 tracks
-    for optional in ("runner", "comparators", "results", "acceptance", "replay"):   # + HTML run replay
+    for optional in ("runner", "comparators", "results", "acceptance", "replay", "ui_server"):   # + interactive UI
         try:
             __import__(f"greenstove.{optional}", fromlist=["register"]).register(sub)
         except ImportError:
