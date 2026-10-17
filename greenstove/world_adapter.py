@@ -15,11 +15,18 @@ from greenstove.env_protocol import (ActualScenario, InfeasibilityProof, Plan, R
 class AbelC0World:
     name = "abel-c0 (Abel's households, allocator, simulator and verifier; power-only)"
 
+    def __init__(self, requirements: Requirements | None = None) -> None:
+        self.requirements = requirements or Requirements()
+
+    def use_requirements(self, requirements: Requirements) -> None:
+        self.requirements = requirements             # allocator must not pick shifts the verifier rejects (review A4)
+
     def household_requests(self, context: ScenarioContext):
         return households.household_requests(context)
 
     def allocate(self, requests, tariff: dict[str, float], context: ScenarioContext, proposal_id: str) -> Plan:
-        return allocator.allocate(requests, tariff, context, proposal_id)
+        return allocator.allocate(requests, tariff, context, proposal_id,
+                                  max_shift_hours=self.requirements.max_shift_hours)
 
     def simulate(self, plan: Plan, context: ScenarioContext, phase: str, actual: ActualScenario | None = None) -> Trace:
         return simulator.simulate(plan, context, phase, actual)

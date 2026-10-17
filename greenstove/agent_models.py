@@ -75,6 +75,7 @@ class EvidenceRecord(_Strict):
     passed: bool
     metrics: dict[str, float]
     feedback_codes: list[str]
+    outcomes: dict[str, str] = {}                    # request_id -> completed | deferred | unserved | pending | ...
 
 
 class ApprovedObservation(_Strict):

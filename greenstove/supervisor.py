@@ -80,12 +80,22 @@ def _feedback_entry(n: int, prices: dict | None, verdicts: list[Verdict], errors
     return entry
 
 
+def _outcomes(plan, trace) -> dict[str, str]:
+    """What was delivered per request (review B5): from the trace and plan, never from the model."""
+    out = {u.request_id: "unserved" for u in plan.unserved}
+    for r in plan.reservations:
+        state = (trace.reservation_outcomes or {}).get(r.reservation_id)
+        out[r.request_id] = state or ("pending" if not r.accepted else "not_started")
+    return out
+
+
 def _evidence(verdict: Verdict, run_id: str, context: ScenarioContext, sit: dict, tariff: dict,
-              proposal_id: str) -> EvidenceRecord:
+              proposal_id: str, outcomes: dict[str, str] | None = None) -> EvidenceRecord:
     return EvidenceRecord(run_id=verdict.run_id, agent_run_id=run_id, scenario_id=context.scenario_id,
                           config_hash=context.config_hash, phase=verdict.phase, day=context.day,
                           situation=sit, tariff=tariff, proposal_id=proposal_id, passed=verdict.passed,
-                          metrics=dict(verdict.metrics), feedback_codes=sorted({f.code for f in verdict.feedback_codes}))
+                          metrics=dict(verdict.metrics), feedback_codes=sorted({f.code for f in verdict.feedback_codes}),
+                          outcomes=outcomes or {})
 
 
 def run_agent_day(context: ScenarioContext, memory_mode: MemoryMode, requirements: Requirements, *,
@@ -156,14 +166,15 @@ def run_agent_day(context: ScenarioContext, memory_mode: MemoryMode, requirement
             verdicts, unmodeled = [], []
             for ph in FORECAST_PHASES:
                 try:
-                    v = env.verify(env.simulate(plan, context, ph), dod_req, context, plan)
+                    trace = env.simulate(plan, context, ph)
+                    v = env.verify(trace, dod_req, context, plan)
                 except ContractError as exc:             # world does not model this phase (e.g. Abel's C0)
                     unmodeled.append(ph)
                     evidence.write(run_id, f"unmodeled_{n}_{ph}", {"phase": ph, "error": str(exc)[:200]})
                     continue
                 evidence.write(run_id, f"verdict_{n}_{ph}", v)
                 rec.simulator_runs += 1
-                ev = _evidence(v, run_id, context, sit, proposal.prices, pid)
+                ev = _evidence(v, run_id, context, sit, proposal.prices, pid, _outcomes(plan, trace))
                 _put(evidence, ev)
                 run_records.append(ev)
                 att.evidence_ids.append(ev.run_id)
@@ -232,13 +243,15 @@ def run_agent_day(context: ScenarioContext, memory_mode: MemoryMode, requirement
 
     if selected_plan is not None and actual is not None:
         try:
-            v = env.verify(env.simulate(selected_plan, context, "actual", actual), dod_req, context, selected_plan)
+            atrace = env.simulate(selected_plan, context, "actual", actual)
+            v = env.verify(atrace, dod_req, context, selected_plan)
         except ContractError as exc:
             rec.reason += f"; actual execution not modeled by this world ({str(exc)[:60]})"
         else:
             evidence.write(run_id, "verdict_actual", v)
             rec.simulator_runs += 1
-            ev = _evidence(v, run_id, context, sit, rec.selected_tariff or {}, rec.selected_proposal_id or "")
+            ev = _evidence(v, run_id, context, sit, rec.selected_tariff or {}, rec.selected_proposal_id or "",
+                           _outcomes(selected_plan, atrace))
             _put(evidence, ev)
             run_records.append(ev)
             rec.execution = ExecutionRecord(outcome_passed=complete_pass(v), evidence_id=ev.run_id,
