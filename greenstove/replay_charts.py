@@ -257,7 +257,7 @@ def line_chart(series: dict[str, list[float]], *, limits: dict[str, float] | Non
             f'<path d="M{_c(left)} {_c(y)}H{_c(left + pw)}" stroke="var(--limit,currentColor)" '
             f'stroke-width="1.5" stroke-dasharray="5 4" data-limit="{escape(name, quote=True)}"/>'
         )
-        lab = f"{name} {_fmt(v)} {unit}".strip()
+        lab = name if any(ch.isdigit() for ch in name) else f"{name} {_fmt(v)} {unit}".strip()   # value already in label
         ly = y - 4 if y - 4 > top + 8 else y + 12
         out.append(_text(left + pw - 2, ly, lab, anchor="end", fill="--ink"))
 

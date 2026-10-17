@@ -281,6 +281,7 @@ def _hours_axis() -> str:
 
 def act_world(snap: dict) -> str:
     ctx = (snap.get("world") or {}).get("context") or (snap.get("proposal") or {}).get("context") or {}
+    snap_world = (snap.get("meta") or {}).get("world", "")
     if not ctx:
         return _act("world", _missing("The day's context"))
     fpv = sum(ctx.get("forecast_pv_kw") or []) / 4
@@ -290,7 +291,8 @@ def act_world(snap: dict) -> str:
         ("weather forecast", esc(ctx.get("weather_class"))),
         ("inverter limit", f"{esc(num(ctx.get('inverter_kw')))} kW"),
         ("battery", f"{esc(num(ctx.get('battery_capacity_kwh')))} kWh, starts {esc(num(ctx.get('initial_battery_kwh')))}"),
-        ("reserve floor", f"{esc(num(ctx.get('reserve_kwh')))} kWh"),
+        (("battery floor" if "admission" in str(snap_world) else "cooking reserve"),
+         f"{esc(num(ctx.get('reserve_kwh')))} kWh"),
         ("forecast PV", f"{fpv:.2f} kWh (downside {dpv:.2f})"),
     ])
     rows = [[f"<code>{esc(r.get('household_id'))}</code>", esc(num(r.get("power_kw"))),
@@ -369,10 +371,17 @@ def _trace_chart(traces: dict, ctx: dict) -> str:
     series = {"PV (kW)": tr.get("pv_kw") or [], "demand (kW)": tr.get("demand_kw") or []}
     if tr.get("battery_kwh"):
         series["battery (kWh)"] = tr["battery_kwh"]
+    floor_world = "admission" in str(tr.get("simulator_version") or "")    # Abel's ledger: a hard floor
+    reserve_label = (f"battery floor {num(ctx.get('reserve_kwh'))} kWh" if floor_world else
+                     f"cooking reserve {num(ctx.get('reserve_kwh'))} kWh")
     limits = {f"inverter {num(ctx.get('inverter_kw'))} kW": ctx.get("inverter_kw"),
-              f"reserve {num(ctx.get('reserve_kwh'))} kWh": ctx.get("reserve_kwh")}
+              reserve_label: ctx.get("reserve_kwh")}
     limits = {k: float(v) for k, v in limits.items() if v is not None}
     note = "" if tr.get("battery_kwh") else '<p class="muted">battery: not modeled by this world</p>'
+    if tr.get("battery_kwh") and not floor_world:
+        note += ('<p class="muted small">Stand-in world: below the cooking reserve no new cooking may start; '
+                 'the essential load may still draw on the battery at night. Abel\'s admission world uses a hard '
+                 'floor instead.</p>')
     mb = f" · battery minimum {min(tr['battery_kwh']):.2f} kWh" if tr.get("battery_kwh") else ""
     return (line_chart(series, limits=limits, title=f"Selected plan on the {label}", y_unit="kW / kWh",
                        emphasis="demand (kW)")
