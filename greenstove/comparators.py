@@ -188,7 +188,9 @@ def _check(env: Environment, requests, tariff: dict, context: ScenarioContext, d
     for ph in FORECAST_PHASES:
         try:
             v = env.verify(env.simulate(plan, context, ph), dod_req, context, plan)
-        except ContractError:
+        except ContractError as exc:
+            if not str(exc).startswith(("UNSUPPORTED_PHASE:", "UNSUPPORTED_PROFILE:")):
+                raise
             unmodeled.append(ph)
             continue
         sims += 1
@@ -244,6 +246,8 @@ def run_comparator(condition: str, context: ScenarioContext, candidates: list[di
         try:
             v = env.verify(env.simulate(plan, context, "actual", actual), dod_req, context, plan)
         except ContractError as exc:
+            if not str(exc).startswith(("UNSUPPORTED_PHASE:", "UNSUPPORTED_PROFILE:")):
+                raise
             rec.reason += f"; actual execution not modeled by this world ({str(exc)[:60]})"
         else:
             rec.simulator_runs += 1

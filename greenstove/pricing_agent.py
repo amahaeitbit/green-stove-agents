@@ -137,10 +137,10 @@ def _memory_entries(brief_text: str, names: set[str]) -> list[tuple[str, dict, b
 
 def _adjust(prices: dict, codes: set[str], lattice: dict, order: list[str]) -> dict:
     prices, cheap, dear = dict(prices), order[0], order[-1]
-    if codes & {"BATTERY_RESERVE", "INVERTER_LIMIT", "ESSENTIAL_UNSERVED"}:
+    if codes & {"BATTERY_RESERVE", "INVERTER_LIMIT", "ESSENTIAL_UNSERVED", "ADMISSION_REFUSED", "UNSERVED_CAPACITY"}:
         prices[dear] = _step(lattice[dear], prices[dear], +1)
         prices[cheap] = _step(lattice[cheap], prices[cheap], -1)
-    if "BUDGET_EXCEEDED" in codes:
+    if codes & {"BUDGET_EXCEEDED", "UNSERVED_BUDGET"}:
         prices[dear] = _step(lattice[dear], prices[dear], -1)
     if codes == {"SERVICE_SHORTFALL"}:
         prices[cheap] = _step(lattice[cheap], prices[cheap], -1)

@@ -1,99 +1,70 @@
-# Environment correctness handoff to Isaac
+# Reconciled environment and agent integration
 
-Abel's environment branch now contains your agent code through `1c5ef6f` plus an
-independent admission verifier. Merge `environment-evidence` into `agents-memory`
-before changing the hooks below. No agent-owned implementation files were edited.
+Updated after merging Isaac's `agents-memory@3c86604` into Abel's environment branch.
+This supersedes the previous instructions to apply two loader/fingerprint hooks: those
+hooks are now implemented. Agent-owned integration files were updated as part of Abel's
+explicit request to reconcile the two implementations.
 
-## Implemented on Abel's side
+## What is now connected
 
-- `greenstove/admission_verifier.py`: independent replay of the full day, including
-  zero-future-solar admission, outstanding sessions, essential demand, discharge/charge
-  limits and efficiencies, delivered cooking, battery balance and completion. It never
-  calls `can_start`, `advance_interval` or the simulator to verify their outputs.
-- Full plan validation: tariff/quote provenance, household authority, windows/budgets,
-  duplicate request/reservation IDs, unserved partition and pending capacity holds.
-- Trace/config/phase identities, separate authoritative actual PV, requirements and
-  BatterySpec matching. A different requirements snapshot raises ContractError; explicitly
-  re-simulate the candidate under the new fixed requirements instead of replacing evidence.
-- Informational UNSERVED_* remains informational. Prevented starts use ADMISSION_REFUSED
-  with a reason, rather than implying an actual inverter or reserve violation occurred.
-- `configuration()` and `configuration_hash()` include BatterySpec, policy version,
-  simulator version, independent verifier version and optional fixed requirements.
-- `greenstove/admission_world.py`: a bridge inheriting your existing day simulation but
-  using the independent verifier. It captures actual inputs separately, in application
-  memory, so the verifier never takes actual PV from an untrusted trace. Saved traces
-  can also be verified directly by passing the corresponding ActualScenario explicitly.
-- Tests include the six-completions/zero-energy attack, 15 development/phase combinations,
-  essential shortages, forged records, compatibility hashes, detached inputs and a real
-  supervisor run with a deterministic mock proposal reaching actual execution.
+- `GREENSTOVE_WORLD=abel-admission` selects `admission_world.AdmissionWorld`, with
+  `independent-admission-2` verification and `admission-execution-2` simulation identities.
+- Normal simulation and the acceptance rehearsal use Isaac's same `acceptance.execute`
+  ledger loop. Independent verification reconstructs that loop without calling it.
+- The verifier supports an explicitly supplied start step for the last-hour fixture,
+  while normal days start at zero. A late start cannot be inferred from untrusted metadata.
+- Accepted sessions deferred for energy are finalized as unserved at their last valid
+  start, with no automatic retiming or authorization changes. Pending offers remain
+  approval-needed and are never admitted or counted as delivered.
+- The supervisor saves expected/downside/actual traces, verdicts, final household notices
+  and actual-execution event records. Events are reconstructed from verified decisions
+  and outcomes, rather than trusted from arbitrary trace metadata. Each event includes
+  only its recipient's own information. These are in-process simulated notices, not a
+  broker, network delivery, calendar integration or real device commands.
+- Contract inconsistencies now stop supervisor/comparator execution. Only explicit
+  UNSUPPORTED_PHASE/UNSUPPORTED_PROFILE errors are labeled as unmodeled coverage.
+- Memory configuration fingerprints include the battery specification and policy,
+  simulator and verifier versions. The CLI manifest records the admission configuration
+  and the actual scenario configuration hash. The definition of done/effective requirements
+  remain explicit in the frozen manifest; do not mix memory across different definitions.
+- The mock pricing adapter understands the informational UNSERVED_* and ADMISSION_REFUSED
+  signals. Preventing a start does not report an actual inverter or battery-floor trip.
 
-## Isaac: two small hooks before the joint merge
+## Validation
 
-1. In `greenstove/env_protocol.py`, change only the import in the `abel-admission`
-   branch of `load_environment()`:
+Final full pytest suite: **308 passed, 21 subtests passed**. This includes regressions
+for the actual loader, private execution events, terminal defer outcomes, saved traces,
+independent acceptance verification and refusing to downgrade tampered evidence.
+The 102-test unittest suite, all three fixture checkers and the acceptance CLI also passed.
 
-```python
-from greenstove.admission_world import AdmissionWorld
-return AdmissionWorld()
+The full mock e2e with two A/B/C evaluation days completed, including compare, acceptance
+and report. The summary counted 443 nested simulations and zero unmodeled phases. Those
+counts include nested track exercises; they are pipeline evidence, not a model-quality
+measurement. All 40 verdict files in the top-level development evidence folder identified
+`independent-admission-2`. The hand-calculated acceptance fixture passed every condition
+and deliberately returned NO_VERIFIED_PLAN because its service target was not met.
+
+Run the current suite and checkers:
+
+```bash
+python -m pytest -q
+python -m unittest discover -s tests -q
+python scripts/admission_check.py
+python scripts/allocator_check.py
+python scripts/c0_check.py
+GREENSTOVE_WORLD=abel-admission python -m greenstove acceptance
+GREENSTOVE_WORLD=abel-admission python -m greenstove e2e --mode mock --days 2
 ```
 
-   This replaces the import from `world_adapter`. Keep the original class in
-   world_adapter: the independent bridge uses it for simulation. Do not make the
-   original world_adapter class import/subclass the bridge (that creates a cycle).
+## Next joint action
 
-2. In `cli.admission_variant`, replace the literal policy-name hash with the fingerprint
-   from the base context, before changing that context's config_hash:
+Isaac should merge `origin/environment-evidence` into `agents-memory`, run the checks,
+and inspect one actual trace, household outbox and independent verdict together with Abel.
+Then merge the combined branch into main. No force push or separate cherry-picking of
+shared files is needed. Human checkpoint sign-offs have not been fabricated.
 
-```python
-from greenstove.admission_verifier import configuration_hash
-from greenstove.world_adapter import battery_spec
-from greenstove.scenarios import DEFAULT_REQUIREMENTS
-
-fingerprint = configuration_hash(ctx, battery_spec(ctx), DEFAULT_REQUIREMENTS)
-# In the existing model_copy update:
-# "config_hash": fingerprint
-```
-
-   Use this same recipe for development, held-out and forecast contexts. Requirements
-   are also a compatibility dimension: when using a different definition of done,
-   apply the corresponding requirements fingerprint consistently or exclude those notes.
-   Avoid hashing an already transformed admission context a second time. Include
-   `env.configuration_record(base_context)` and the effective requirements/spec hash
-   in the frozen manifest. Existing memory produced under the old literal salt should
-   not be reused; regenerate development memory and freeze it again.
-
-## Isaac: lifecycle/message items still yours
-
-- Save phase traces in the evidence folder before verification, linked to verdict IDs.
-- Emit only actual household-specific start/wait/completed events from an authoritative
-  request-to-household map. Forecast admissions are predictions, not start commands.
-- Finalize accepted sessions that never start as UNSERVED at the deadline/day end;
-  preserve the original DEFER event. Pending offers need an explicit not-approved final
-  outcome. No silent rebooking or authority change.
-- The current bridge deliberately verifies the current version-1 trace format. If you
-  change outcomes or add terminal events, coordinate the trace contract/version and
-  update both simulation and independent replay. Do not bypass verification to pass tests.
-- Teach feedback consumers that ADMISSION_REFUSED means a start was prevented; consult
-  its reason to distinguish energy, power or authority. It is not a physical reserve trip.
-- Emit canonical `models.tariff_version(plan.tariff)` in new traces. The verifier accepts
-  both the legacy version-1 and canonical tariff recipes during this handoff.
-
-## Joint acceptance
-
-Validation of this increment: **273 pytest tests passed (21 subtests), 102 unittest
-tests passed**, and admission_check.py, allocator_check.py and c0_check.py passed.
-The new tests exercise the bridge through the real supervisor with mock inference,
-including actual execution; the full default CLI switch still needs the hook above.
-
-Run both test suites and all checkers, then a mock e2e using `GREENSTOVE_WORLD=abel-admission`.
-Confirm actual verdicts identify `independent-admission-1`, not `admission-glue-1`.
-The default CLI remains on the old glue until Isaac applies the import hook above.
-Do not treat green tests of the new verifier as proof that the default CLI has switched.
-
-Run the hand-calculated step-92 fixture through the actual event path after message
-routing is connected. Existing admission_check.py continues to prove the environment's
-fixture arithmetic; it does not prove household message delivery.
-
-These fixes do not establish calibrated village behavior, live device control, live
-partner-tool operation or a memory advantage. C0 simulator/verifier and fixtures remain
-power-only and unchanged.
+Regenerate development memory and freeze it again: fingerprints and verdict identities
+changed. Do not compare the old recorded mock results page with a new run as if they shared
+the same environment. Official held-out evaluation must use frozen settings and fresh
+records. Live Crusoe/Nemotron evidence, partner integrations and a memory advantage remain
+separate claims requiring their own evidence. Original C0 fixtures stay power-only.
