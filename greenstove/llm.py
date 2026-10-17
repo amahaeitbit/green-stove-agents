@@ -25,7 +25,7 @@ from greenstove.agent_models import CallRecord, stable_hash
 
 ROOT = Path(__file__).resolve().parents[1]
 MockHandler = Callable[[dict[str, Any]], dict[str, Any]]
-ROLES = ("pricing", "note_writer", "forecast_extractor", "playbook_reviewer")
+ROLES = ("pricing", "note_writer", "forecast_extractor", "playbook_reviewer", "spec_writer")
 
 
 class ModelError(RuntimeError):

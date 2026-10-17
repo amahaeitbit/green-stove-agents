@@ -24,8 +24,13 @@ def _mock_forecast(payload):
     return mock_extractor(payload)
 
 
+def _mock_spec(payload):
+    from greenstove.spec_agent import mock_spec_writer
+    return mock_spec_writer(payload)
+
+
 MOCKS = {"pricing": pricing_agent.mock_pricing, "note_writer": note_writer.mock_note_writer,
-         "forecast_extractor": _mock_forecast}
+         "forecast_extractor": _mock_forecast, "spec_writer": _mock_spec}
 
 
 def data_dir() -> Path:

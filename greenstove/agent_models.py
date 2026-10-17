@@ -157,6 +157,12 @@ class ExecutionRecord(_Strict):
     metrics: dict[str, float]
 
 
+class Decision(_Strict):
+    attempt: int
+    decision: Literal["continue", "re-plan", "stop", "ping_human"]
+    reason: str
+
+
 class RunRecord(_Strict):
     agent_run_id: str
     scenario_id: str
@@ -177,6 +183,8 @@ class RunRecord(_Strict):
     simulator_runs: int = 0
     notes: list[AdmissionResult] = []
     quarantined_notes: list[ObservationProposal] = []
+    decisions: list[Decision] = []                   # continue | re-plan | stop | ping_human, with reasons
+    definition_of_done: dict[str, Any] | None = None  # spec hash and checks used for this run
 
 
 def situation_of(context: ScenarioContext) -> dict[str, float | str]:

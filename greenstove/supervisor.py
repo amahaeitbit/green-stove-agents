@@ -10,7 +10,7 @@ import uuid
 from typing import Any
 
 from greenstove import note_writer, pricing_agent
-from greenstove.agent_models import (AttemptRecord, Brief, EvidenceRecord, ExecutionRecord, MemoryMode,
+from greenstove.agent_models import (AttemptRecord, Brief, Decision, EvidenceRecord, ExecutionRecord, MemoryMode,
                                      RunPhase, RunRecord, situation_of)
 from greenstove.brain import briefs, keeper
 from greenstove.brain.store import BrainStore
@@ -18,8 +18,18 @@ from greenstove.env_protocol import ActualScenario, ContractError, Environment, 
 from greenstove.evidence import EvidenceStore
 from greenstove.llm import LLMClient, ModelError
 from greenstove.pricing_agent import hhmm
+from greenstove.spec_agent import DefinitionOfDone
 
 FORECAST_PHASES = ("forecast_expected", "forecast_downside")
+
+
+def _score(verdicts: list[Verdict], dod_fail: list[str]) -> float:
+    """Lower is better: failed conditions + definition-of-done failures + unserved share."""
+    if not verdicts:
+        return 99.0
+    failed = sum(not c.passed for v in verdicts for c in v.conditions)
+    served = sum(v.metrics.get("served_fraction", 0.0) for v in verdicts) / len(verdicts)
+    return failed + len(dod_fail) + (1 - served)
 
 
 def complete_pass(v: Verdict) -> bool:
@@ -81,7 +91,8 @@ def run_agent_day(context: ScenarioContext, memory_mode: MemoryMode, requirement
                   env: Environment, llm: LLMClient, evidence: EvidenceStore, brain: BrainStore | None = None,
                   history: list[EvidenceRecord] | None = None, phase: RunPhase = "development",
                   actual: ActualScenario | None = None, max_attempts: int = 3, write_notes: bool | None = None,
-                  brief_budget: int = 600, keeper_ttl_days: int = 30, playbook: str = "") -> RunRecord:
+                  brief_budget: int = 600, keeper_ttl_days: int = 30, playbook: str = "",
+                  dod: "DefinitionOfDone | None" = None) -> RunRecord:
     run_id = f"run-{context.scenario_id}-{memory_mode}-{uuid.uuid4().hex[:6]}"
     llm.reset_budget()
     sit = situation_of(context)
@@ -92,11 +103,22 @@ def run_agent_day(context: ScenarioContext, memory_mode: MemoryMode, requirement
     if write_notes is None:
         write_notes = phase == "development"
 
-    proof = env.lower_bound(context, requirements)
+    dod_req = dod.requirements(requirements) if dod is not None else requirements
+    if dod is not None:
+        rec.definition_of_done = {"spec_hash": dod.spec_hash(), "goal": dod.goal,
+                                  "checks": [c.model_dump() for c in dod.checks]}
+
+    def decide(n: int, what: str, why: str) -> None:
+        rec.decisions.append(Decision(attempt=n, decision=what, reason=why))
+
+    proof = env.lower_bound(context, dod_req)
     if proof is not None:
         rec.status, rec.reason = "INFEASIBLE", "deterministic energy bound exceeds available energy"
         rec.infeasibility = proof.model_dump()
+        decide(0, "stop", "a deterministic energy bound proves the day cannot meet the definition of done")
+        decide(0, "ping_human", "the committee decides which requests to defer; agents never relax requirements")
         evidence.save_run(rec)
+        _write_decision(rec, context, env, dod_req, evidence)
         return rec
 
     requests = env.household_requests(context)
@@ -105,6 +127,8 @@ def run_agent_day(context: ScenarioContext, memory_mode: MemoryMode, requirement
     seen: set[str] = set()
     run_records: list[EvidenceRecord] = []
     selected_plan = None
+    best: tuple[float, int, dict] | None = None      # (score, attempt, prices); lower score is better
+    worse_streak, n = 0, 0
     try:
         for n in range(1, max_attempts + 1):
             pid = f"{run_id}-p{n}"
@@ -114,10 +138,12 @@ def run_agent_day(context: ScenarioContext, memory_mode: MemoryMode, requirement
             if proposal is None:
                 att.feedback = ["INVALID_TARIFF"]
                 feedback.append(_feedback_entry(n, None, [], errors))
+                decide(n, "re-plan", f"invalid proposal ({errors[0][:80] if errors else 'unparseable'}); ask again")
                 continue
             h = proposal.tariff_hash()
             if h in seen:
                 rec.reason = f"repeated_proposal at attempt {n}"
+                decide(n, "stop", "looping: proposed a tariff already tried today")
                 break
             seen.add(h)
             plan = env.allocate(requests, proposal.prices, context, pid)
@@ -126,7 +152,7 @@ def run_agent_day(context: ScenarioContext, memory_mode: MemoryMode, requirement
             verdicts, unmodeled = [], []
             for ph in FORECAST_PHASES:
                 try:
-                    v = env.verify(env.simulate(plan, context, ph), requirements, context, plan)
+                    v = env.verify(env.simulate(plan, context, ph), dod_req, context, plan)
                 except ContractError as exc:             # world does not model this phase (e.g. Abel's C0)
                     unmodeled.append(ph)
                     evidence.write(run_id, f"unmodeled_{n}_{ph}", {"phase": ph, "error": str(exc)[:200]})
@@ -139,29 +165,56 @@ def run_agent_day(context: ScenarioContext, memory_mode: MemoryMode, requirement
                 att.evidence_ids.append(ev.run_id)
                 verdicts.append(v)
             rec.candidate_evaluations += 1
-            att.passed = bool(verdicts) and not unmodeled and all(complete_pass(v) for v in verdicts)
-            att.feedback = sorted({f.code for v in verdicts for f in v.feedback_codes})
-            if not att.passed and verdicts and all(v.passed for v in verdicts):
+            dod_fail = sorted({c for v in verdicts for c in dod.evaluate(v.metrics)}) if dod is not None else []
+            att.passed = bool(verdicts) and not unmodeled and all(complete_pass(v) for v in verdicts) and not dod_fail
+            att.feedback = sorted({f.code for v in verdicts for f in v.feedback_codes} | set(dod_fail))
+            only_unchecked = all(c.startswith("DOD_UNCHECKED") for c in dod_fail)
+            if not att.passed and verdicts and all(v.passed for v in verdicts) and only_unchecked:
                 att.feedback.append("INCOMPLETE_COVERAGE")
                 scope = getattr(verdicts[0].coverage, "scope", "unknown")
                 missing = f"; phases not modeled: {', '.join(unmodeled)}" if unmodeled else ""
                 rec.reason = (f"checked conditions passed at attempt {n}, but the world's coverage is incomplete "
                               f"({scope}{missing}); not a verified plan")
+                decide(n, "stop", "the world cannot check everything in the definition of done; never claim done")
                 break
             if att.passed:
                 rec.status, rec.reason = "PLAN_VERIFIED", f"verified at attempt {n}"
                 rec.selected_proposal_id, rec.selected_tariff = pid, proposal.prices
                 selected_plan = plan
+                decide(n, "continue", "every check passed on the expected and downside forecasts; dispatch the plan")
                 break
-            feedback.append(_feedback_entry(n, proposal.prices, verdicts, []))
+            entry = _feedback_entry(n, proposal.prices, verdicts, [])
+            if dod_fail:
+                entry["definition_of_done_failures"] = dod_fail
+            score = _score(verdicts, dod_fail)
+            if best is not None and score > best[0] + 1e-9:
+                worse_streak += 1
+                entry["drift_warning"] = (f"worse than attempt {best[1]} (score {score:.2f} vs {best[0]:.2f}); "
+                                          f"move back toward attempt {best[1]}'s prices {best[2]}")
+            else:
+                worse_streak = 0
+                best = (score, n, dict(proposal.prices))
+            feedback.append(entry)
+            if worse_streak >= 2:
+                rec.reason = f"drifting: attempts got worse twice in a row (best was attempt {best[1]})"
+                decide(n, "stop", rec.reason)
+                break
+            if n < max_attempts:
+                decide(n, "re-plan", f"failed {', '.join(att.feedback[:4])}; new candidate from verifier feedback"
+                       + ("; drift warning sent" if worse_streak else ""))
         else:
             rec.reason = f"attempt budget of {max_attempts} exhausted"
+            decide(n, "stop", rec.reason)
     except ModelError as exc:
         rec.status, rec.reason = "ERROR", f"model_error: {exc}"
+        decide(n, "stop", "model or network error; nothing is dispatched (not reported as infeasible)")
+    if rec.status == "NO_VERIFIED_PLAN" and not rec.reason.startswith("checked conditions passed"):
+        decide(n, "ping_human", "no verified plan on a day not proven infeasible; nothing is dispatched, "
+                                "the operator decides")
 
     if selected_plan is not None and actual is not None:
         try:
-            v = env.verify(env.simulate(selected_plan, context, "actual", actual), requirements, context, selected_plan)
+            v = env.verify(env.simulate(selected_plan, context, "actual", actual), dod_req, context, selected_plan)
         except ContractError as exc:
             rec.reason += f"; actual execution not modeled by this world ({str(exc)[:60]})"
         else:
@@ -177,7 +230,7 @@ def run_agent_day(context: ScenarioContext, memory_mode: MemoryMode, requirement
         _write_notes(rec, run_records, context, brain, evidence, llm, phase, write_notes, brief_budget, keeper_ttl_days)
     rec.calls = list(llm.calls)
     evidence.save_run(rec)
-    _write_decision(rec, context, env, requirements, evidence)
+    _write_decision(rec, context, env, dod_req, evidence)
     return rec
 
 
