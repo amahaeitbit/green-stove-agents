@@ -2,7 +2,7 @@
 
 A shared memory experiment for household energy coordination at a simulated solar cooking station.
 
-**Status: plans only until code and results are added.** No performance improvement or partner integration is established by this repository's design documents.
+**Status (Oct 17, 14:00 PT):** agent layer, Shared Brain, Crusoe integration, You.com forecast and end-to-end tooling are built and tested (branch `agents-memory`, merged with Abel's C0 world). All runs so far are mock-model runs on a labeled stand-in world or Abel's power-only C0 world; no live Nemotron result and no performance improvement is claimed yet.
 
 ## What we are building
 
@@ -43,14 +43,17 @@ Until Abel's world is merged, commands run on a labeled development stand-in
 
 Start with [PLAN.md](PLAN.md). It contains the ordered tasks, six-hour reference schedule, gates C0-C6 and cuts. Commands in the contracts are intended interfaces until implemented.
 
-## Partner tools
+## Event tracks and sponsor tools
 
-- Crusoe runs the core agent inference and records fresh-agent handoffs.
-- Nemotron is the preferred model family if available through the team's Crusoe account; confirm exact IDs and supported parameters.
-- You.com is an optional evidence-to-configuration demonstration using one reviewed public equipment source.
-- NemoClaw/OpenShell is an optional runtime boundary protecting approved memory and evaluator assets from direct agent writes.
-
-Optional integrations do not precede the memory experiment. See [the learning note](docs/llm-learnings-and-partner-tools.md) for provider references and ideas, subject to the current PLAN.
+| Event item | How Green-Stove Agents uses it | Command | Status |
+| --- | --- | --- | --- |
+| **Shared Brain** (primary track) | Every agent reads a 600-token brief from one shared memory before it works; after it works, a code Keeper admits only notes that match recorded evidence, rejects fabricated numbers and rule changes, keeps conflicts scoped, expires stale entries; frozen for evaluation; fresh agents compared with no memory and raw history on held-out days | `gsa warmup`, `gsa brain show\|audit`, `gsa freeze`, `gsa eval-agents` | Built, tested in mock; live measurement pending |
+| **Done Means Done** | Fixed machine-checkable requirements, independent simulator + verifier on expected and downside forecasts, max 3 attempts, repeat detection, deterministic infeasibility proof before spending calls, honest statuses (PLAN_VERIFIED, NO_VERIFIED_PLAN, INFEASIBLE, ERROR), operator decision record, human needed only for pending household offers | `gsa run`, `gsa decide` | Built, tested |
+| **Version N+1** | Reviewer agent rewrites the Pricing Agent's playbook from development runs; a change is kept only if it scores better on development days; before/after on unseen days | `gsa evolve`, `gsa playbook before-after` | In progress (separate, labeled experiment) |
+| **Crusoe Managed Inference** | All model calls; live catalog for exact Nemotron ids, supported parameters and pricing; per-role routing; structured output; thinking control; prompt-cache and cost accounting; rate-limit handling | `gsa models`, `gsa bench`, `gsa usage` ([crusoe.md](docs/crusoe.md)) | Built; tested against a simulated endpoint; live run pending key |
+| **NVIDIA Nemotron** | Pricing Agent, Note-writer, forecast extractor (and Version N+1 reviewer) | banner of every command | Pending first live call |
+| **You.com** | Cited weather forecast for the site and date; values kept only if the quote is in the retrieved page; converted to a solar profile | `gsa forecast`, `gsa decide --forecast` | Built, mock-tested; live pending key |
+| **NVIDIA NemoClaw / OpenShell** | Always-on, event-driven runner packaged for a NemoClaw sandbox on a teammate's WSL2/NVIDIA laptop: only Crusoe/You.com egress, frozen memory and config read-only | `gsa runner --watch`, `deploy/nemoclaw/` | In progress; cannot run on the Mac used here |
 
 ## Existing work and scope
 
@@ -70,7 +73,25 @@ The root Word document, Green-Stove Agents — Problem & Solution.docx, remains 
 | [assumptions.md](docs/assumptions.md) | Synthetic parameters and unvalidated claims |
 | [submission.md](docs/submission.md) | Demo and submission wording |
 | [llm-learnings-and-partner-tools.md](docs/llm-learnings-and-partner-tools.md) | Historical reasoning and proposed integrations |
+| [agent-layer.md](docs/agent-layer.md) | How the agents plug into Abel's world; integration status |
+| [end-to-end.md](docs/end-to-end.md) | The whole pipeline mapped onto checkpoints with clock times |
+| [demo-runbook.md](docs/demo-runbook.md) | Stage commands, timing, speakers, fallbacks, video shot list |
+| [decisions.md](docs/decisions.md) | Partner decisions against the team diagram; open questions |
+| [crusoe.md](docs/crusoe.md) | Crusoe features used and how they are measured |
 
 ## Built during the hackathon
 
-To be filled only with implemented features, commits, reproducible commands and measured results. Mark live, recorded-live and mock output separately. No final results are available yet.
+All code below was written on October 17, 2026 after the 10:45 AM PT start (the earlier
+commits are plans only). Live, recorded-live and mock output are labeled everywhere.
+
+- Agent layer (partner): Crusoe client with budgets and usage log; Pricing Agent; Note-writer;
+  Supervisor; Shared Brain (store, Keeper, briefs); held-out A/B/C runner; operator decision
+  record; terminal demo with recording/replay; setup, preflight and end-to-end commands;
+  You.com forecast and solar profile; Crusoe catalog/benchmark/usage tools.
+- World (Abel): C0 typed contract (`greenstove/models.py`), power-only simulator and verifier,
+  fixtures and schemas; merged into the agent layer, which uses his types.
+- Development stand-in world (`greenstove/stub_env.py`), clearly labeled, used until Abel's
+  allocator and battery model land; it is not evidence.
+- Results: none yet beyond mock runs; the results table comes from Abel's evaluation and the
+  live runs.
+
