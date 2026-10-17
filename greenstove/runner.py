@@ -120,6 +120,7 @@ class RunnerContext:
     requirements: Requirements
     max_calls_per_day: int = DEFAULT_MAX_CALLS_PER_DAY
     say: Callable[[str], None] = field(default=lambda s: None)
+    dod: Any = None                              # spec_agent.DefinitionOfDone (frozen definition of done)
 
     @property
     def paths(self) -> Paths:
@@ -136,9 +137,11 @@ def build_context(mode: str | None = None, stub: bool = False, say: Callable[[st
     from greenstove.env_protocol import load_environment
     from greenstove.scenarios import DEFAULT_REQUIREMENTS
     evidence, brain = cli.stores()
-    return RunnerContext(data_dir=cli.data_dir(), env=load_environment(prefer_stub=stub), llm=cli.make_llm(mode),
+    llm = cli.make_llm(mode)
+    return RunnerContext(data_dir=cli.data_dir(), env=load_environment(prefer_stub=stub), llm=llm,
                          evidence=evidence, brain=brain, requirements=DEFAULT_REQUIREMENTS,
-                         max_calls_per_day=max_calls_from_env(), say=say or print)
+                         max_calls_per_day=max_calls_from_env(), say=say or print,
+                         dod=cli.current_spec(llm, DEFAULT_REQUIREMENTS))
 
 
 def _now() -> str:
@@ -259,7 +262,7 @@ def plan_day(date: str, scenario: str, condition: str, forecast_path: str | None
     try:
         run = supervisor.run_agent_day(ctx_day, CONDITIONS[condition], ctx.requirements, env=ctx.env, llm=llm,
                                        evidence=ctx.evidence, brain=ctx.brain,
-                                       actual=make_actual(ctx_day, seed=ctx_day.day + 7))
+                                       actual=make_actual(ctx_day, seed=ctx_day.day + 7), dod=ctx.dod)
     finally:
         llm.s.max_calls = saved_cap
     calls = [c for c in run.calls if c.outcome != "budget"]
