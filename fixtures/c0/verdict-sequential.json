@@ -1,0 +1,75 @@
+{
+  "run_id": "run-2a41173fa008",
+  "simulation_id": "sim-364c36920c75",
+  "scenario_id": "c0-two-households",
+  "config_hash": "eebc0af65a8f",
+  "scenario_hash": "bbdf310a03f1",
+  "phase": "forecast_expected",
+  "passed": true,
+  "conditions": [
+    {
+      "name": "inverter",
+      "passed": true,
+      "value": 0.0,
+      "limit": 0.0
+    },
+    {
+      "name": "service",
+      "passed": true,
+      "value": 1.0,
+      "limit": 1.0
+    },
+    {
+      "name": "max_shift",
+      "passed": true,
+      "value": 0.5,
+      "limit": 3.0
+    },
+    {
+      "name": "budget",
+      "passed": true,
+      "value": 0.0,
+      "limit": 0.0
+    },
+    {
+      "name": "bookings",
+      "passed": true,
+      "value": 0.0,
+      "limit": 0.0
+    }
+  ],
+  "metrics": {
+    "served_fraction": 1.0,
+    "completed_sessions": 2.0,
+    "requested_sessions": 2.0,
+    "overload_steps": 0.0,
+    "max_shift_hours": 0.5,
+    "total_spend": 19.5,
+    "revenue": 19.5,
+    "peak_load_kw": 2.0,
+    "cooking_energy_kwh": 1.5
+  },
+  "feedback_codes": [],
+  "verifier_version": "c0-power-only-3",
+  "requirements": {
+    "min_service_fraction": 1.0,
+    "max_shift_hours": 3.0,
+    "essential_unserved_kwh": 0.0
+  },
+  "coverage": {
+    "scope": "c0-power-only",
+    "complete": false,
+    "phases_checked": [
+      "forecast_expected"
+    ],
+    "not_modeled": [
+      "pv_supply",
+      "battery_energy",
+      "battery_reserve",
+      "battery_power",
+      "essential_load",
+      "forecast_downside",
+      "actual_execution"
+    ]
+  }
+}

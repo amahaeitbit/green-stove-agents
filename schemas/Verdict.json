@@ -1,0 +1,285 @@
+{
+  "$defs": {
+    "Condition": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "passed": {
+          "title": "Passed",
+          "type": "boolean"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        },
+        "limit": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Limit"
+        }
+      },
+      "required": [
+        "name",
+        "passed"
+      ],
+      "title": "Condition",
+      "type": "object"
+    },
+    "Coverage": {
+      "additionalProperties": false,
+      "properties": {
+        "scope": {
+          "title": "Scope",
+          "type": "string"
+        },
+        "complete": {
+          "title": "Complete",
+          "type": "boolean"
+        },
+        "phases_checked": {
+          "items": {
+            "enum": [
+              "forecast_expected",
+              "forecast_downside",
+              "actual"
+            ],
+            "type": "string"
+          },
+          "title": "Phases Checked",
+          "type": "array"
+        },
+        "not_modeled": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Not Modeled",
+          "type": "array"
+        }
+      },
+      "required": [
+        "scope",
+        "complete",
+        "phases_checked",
+        "not_modeled"
+      ],
+      "title": "Coverage",
+      "type": "object"
+    },
+    "Feedback": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "interval": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Interval"
+        },
+        "end_interval": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End Interval"
+        },
+        "request_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Request Id"
+        },
+        "request_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Request Ids",
+          "type": "array"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        },
+        "limit": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Limit"
+        },
+        "message": {
+          "default": "",
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code"
+      ],
+      "title": "Feedback",
+      "type": "object"
+    },
+    "Requirements": {
+      "additionalProperties": false,
+      "description": "Fixed requirements from configuration; never relaxed by the agent layer.",
+      "properties": {
+        "min_service_fraction": {
+          "default": 1.0,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Min Service Fraction",
+          "type": "number"
+        },
+        "max_shift_hours": {
+          "default": 3.0,
+          "minimum": 0,
+          "title": "Max Shift Hours",
+          "type": "number"
+        },
+        "essential_unserved_kwh": {
+          "default": 0.0,
+          "minimum": 0,
+          "title": "Essential Unserved Kwh",
+          "type": "number"
+        }
+      },
+      "title": "Requirements",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "simulation_id": {
+      "title": "Simulation Id",
+      "type": "string"
+    },
+    "scenario_id": {
+      "title": "Scenario Id",
+      "type": "string"
+    },
+    "config_hash": {
+      "title": "Config Hash",
+      "type": "string"
+    },
+    "scenario_hash": {
+      "title": "Scenario Hash",
+      "type": "string"
+    },
+    "phase": {
+      "enum": [
+        "forecast_expected",
+        "forecast_downside",
+        "actual"
+      ],
+      "title": "Phase",
+      "type": "string"
+    },
+    "passed": {
+      "title": "Passed",
+      "type": "boolean"
+    },
+    "conditions": {
+      "items": {
+        "$ref": "#/$defs/Condition"
+      },
+      "title": "Conditions",
+      "type": "array"
+    },
+    "metrics": {
+      "additionalProperties": {
+        "type": "number"
+      },
+      "title": "Metrics",
+      "type": "object"
+    },
+    "feedback_codes": {
+      "items": {
+        "$ref": "#/$defs/Feedback"
+      },
+      "title": "Feedback Codes",
+      "type": "array"
+    },
+    "verifier_version": {
+      "title": "Verifier Version",
+      "type": "string"
+    },
+    "requirements": {
+      "$ref": "#/$defs/Requirements"
+    },
+    "coverage": {
+      "$ref": "#/$defs/Coverage"
+    }
+  },
+  "required": [
+    "run_id",
+    "simulation_id",
+    "scenario_id",
+    "config_hash",
+    "scenario_hash",
+    "phase",
+    "passed",
+    "conditions",
+    "metrics",
+    "feedback_codes",
+    "verifier_version",
+    "requirements",
+    "coverage"
+  ],
+  "title": "Verdict",
+  "type": "object"
+}

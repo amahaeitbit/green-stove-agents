@@ -1,0 +1,145 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "simulation_id": {
+      "title": "Simulation Id",
+      "type": "string"
+    },
+    "scenario_id": {
+      "title": "Scenario Id",
+      "type": "string"
+    },
+    "config_hash": {
+      "title": "Config Hash",
+      "type": "string"
+    },
+    "scenario_hash": {
+      "title": "Scenario Hash",
+      "type": "string"
+    },
+    "phase": {
+      "enum": [
+        "forecast_expected",
+        "forecast_downside",
+        "actual"
+      ],
+      "title": "Phase",
+      "type": "string"
+    },
+    "proposal_id": {
+      "title": "Proposal Id",
+      "type": "string"
+    },
+    "tariff_version": {
+      "title": "Tariff Version",
+      "type": "string"
+    },
+    "simulator_version": {
+      "title": "Simulator Version",
+      "type": "string"
+    },
+    "pv_kw": {
+      "items": {
+        "type": "number"
+      },
+      "maxItems": 96,
+      "minItems": 96,
+      "title": "Pv Kw",
+      "type": "array"
+    },
+    "cooking_kw": {
+      "items": {
+        "type": "number"
+      },
+      "maxItems": 96,
+      "minItems": 96,
+      "title": "Cooking Kw",
+      "type": "array"
+    },
+    "demand_kw": {
+      "items": {
+        "type": "number"
+      },
+      "maxItems": 96,
+      "minItems": 96,
+      "title": "Demand Kw",
+      "type": "array"
+    },
+    "battery_kwh": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Battery Kwh"
+    },
+    "overload_steps": {
+      "default": [],
+      "items": {
+        "type": "integer"
+      },
+      "title": "Overload Steps",
+      "type": "array"
+    },
+    "unserved_essential_kwh": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Unserved Essential Kwh"
+    },
+    "unserved_cooking_kwh": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Unserved Cooking Kwh"
+    },
+    "reservation_outcomes": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "default": {},
+      "title": "Reservation Outcomes",
+      "type": "object"
+    },
+    "extra": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Extra",
+      "type": "object"
+    }
+  },
+  "required": [
+    "simulation_id",
+    "scenario_id",
+    "config_hash",
+    "scenario_hash",
+    "phase",
+    "proposal_id",
+    "tariff_version",
+    "simulator_version",
+    "pv_kw",
+    "cooking_kw",
+    "demand_kw"
+  ],
+  "title": "Trace",
+  "type": "object"
+}

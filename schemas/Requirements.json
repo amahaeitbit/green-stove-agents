@@ -1,0 +1,27 @@
+{
+  "additionalProperties": false,
+  "description": "Fixed requirements from configuration; never relaxed by the agent layer.",
+  "properties": {
+    "min_service_fraction": {
+      "default": 1.0,
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Min Service Fraction",
+      "type": "number"
+    },
+    "max_shift_hours": {
+      "default": 3.0,
+      "minimum": 0,
+      "title": "Max Shift Hours",
+      "type": "number"
+    },
+    "essential_unserved_kwh": {
+      "default": 0.0,
+      "minimum": 0,
+      "title": "Essential Unserved Kwh",
+      "type": "number"
+    }
+  },
+  "title": "Requirements",
+  "type": "object"
+}

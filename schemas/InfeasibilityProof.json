@@ -1,0 +1,27 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "lower_bound_kwh": {
+      "title": "Lower Bound Kwh",
+      "type": "number"
+    },
+    "available_kwh": {
+      "title": "Available Kwh",
+      "type": "number"
+    },
+    "assumptions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Assumptions",
+      "type": "array"
+    }
+  },
+  "required": [
+    "lower_bound_kwh",
+    "available_kwh",
+    "assumptions"
+  ],
+  "title": "InfeasibilityProof",
+  "type": "object"
+}

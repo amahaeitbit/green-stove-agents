@@ -1,0 +1,12 @@
+{
+  "request_id": "req-A",
+  "household_id": "hh-A",
+  "power_kw": 1.0,
+  "duration_steps": 2,
+  "preferred_start": 72,
+  "earliest_start": 68,
+  "latest_finish": 80,
+  "max_cost": 20.0,
+  "shift_penalty": 2.0,
+  "auto_book": false
+}

@@ -1,0 +1,31 @@
+{
+  "proposal_id": "c0-fixed",
+  "tariff": {
+    "standard": 8.0,
+    "sun": 4.0,
+    "peak": 13.0
+  },
+  "reservations": [
+    {
+      "reservation_id": "res-req-A-72",
+      "request_id": "req-A",
+      "start_step": 72,
+      "end_step": 74,
+      "power_kw": 1.0,
+      "locked_cost": 6.5,
+      "tariff_version": "9708a29abf",
+      "accepted": true
+    },
+    {
+      "reservation_id": "res-req-B-74",
+      "request_id": "req-B",
+      "start_step": 74,
+      "end_step": 76,
+      "power_kw": 2.0,
+      "locked_cost": 13.0,
+      "tariff_version": "9708a29abf",
+      "accepted": true
+    }
+  ],
+  "unserved": []
+}

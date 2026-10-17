@@ -1,0 +1,118 @@
+{
+  "$defs": {
+    "Reservation": {
+      "additionalProperties": false,
+      "properties": {
+        "reservation_id": {
+          "minLength": 1,
+          "title": "Reservation Id",
+          "type": "string"
+        },
+        "request_id": {
+          "minLength": 1,
+          "title": "Request Id",
+          "type": "string"
+        },
+        "start_step": {
+          "exclusiveMaximum": 96,
+          "minimum": 0,
+          "title": "Start Step",
+          "type": "integer"
+        },
+        "end_step": {
+          "exclusiveMinimum": 0,
+          "maximum": 96,
+          "title": "End Step",
+          "type": "integer"
+        },
+        "power_kw": {
+          "exclusiveMinimum": 0,
+          "title": "Power Kw",
+          "type": "number"
+        },
+        "locked_cost": {
+          "minimum": 0,
+          "title": "Locked Cost",
+          "type": "number"
+        },
+        "tariff_version": {
+          "minLength": 1,
+          "title": "Tariff Version",
+          "type": "string"
+        },
+        "accepted": {
+          "title": "Accepted",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "reservation_id",
+        "request_id",
+        "start_step",
+        "end_step",
+        "power_kw",
+        "locked_cost",
+        "tariff_version",
+        "accepted"
+      ],
+      "title": "Reservation",
+      "type": "object"
+    },
+    "Unserved": {
+      "additionalProperties": false,
+      "properties": {
+        "request_id": {
+          "title": "Request Id",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "request_id",
+        "reason"
+      ],
+      "title": "Unserved",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "proposal_id": {
+      "minLength": 1,
+      "title": "Proposal Id",
+      "type": "string"
+    },
+    "tariff": {
+      "additionalProperties": {
+        "type": "number"
+      },
+      "title": "Tariff",
+      "type": "object"
+    },
+    "reservations": {
+      "items": {
+        "$ref": "#/$defs/Reservation"
+      },
+      "title": "Reservations",
+      "type": "array"
+    },
+    "unserved": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Unserved"
+      },
+      "title": "Unserved",
+      "type": "array"
+    }
+  },
+  "required": [
+    "proposal_id",
+    "tariff",
+    "reservations"
+  ],
+  "title": "Plan",
+  "type": "object"
+}
