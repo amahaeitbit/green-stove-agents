@@ -1,12 +1,12 @@
 {
-  "simulation_id": "sim-0dfb46dd5dbc",
+  "simulation_id": "sim-3d7d81170a33",
   "scenario_id": "c0-two-households",
   "config_hash": "eebc0af65a8f",
   "scenario_hash": "bbdf310a03f1",
   "phase": "forecast_expected",
   "proposal_id": "c0-fixed",
   "tariff_version": "9708a29abf",
-  "simulator_version": "c0-power-only-3",
+  "simulator_version": "c0-power-only-4",
   "pv_kw": [
     0.0,
     0.0,

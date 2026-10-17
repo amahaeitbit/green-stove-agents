@@ -1,6 +1,6 @@
 {
-  "run_id": "run-2a41173fa008",
-  "simulation_id": "sim-364c36920c75",
+  "run_id": "run-a51510679f18",
+  "simulation_id": "sim-e4a62e26fdb5",
   "scenario_id": "c0-two-households",
   "config_hash": "eebc0af65a8f",
   "scenario_hash": "bbdf310a03f1",
@@ -50,7 +50,7 @@
     "cooking_energy_kwh": 1.5
   },
   "feedback_codes": [],
-  "verifier_version": "c0-power-only-3",
+  "verifier_version": "c0-power-allocator-7",
   "requirements": {
     "min_service_fraction": 1.0,
     "max_shift_hours": 3.0,

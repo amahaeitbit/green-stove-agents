@@ -1,6 +1,6 @@
 {
-  "run_id": "run-a3fd9312e6f5",
-  "simulation_id": "sim-0dfb46dd5dbc",
+  "run_id": "run-bd8a350a60ac",
+  "simulation_id": "sim-3d7d81170a33",
   "scenario_id": "c0-two-households",
   "config_hash": "eebc0af65a8f",
   "scenario_hash": "bbdf310a03f1",
@@ -64,7 +64,7 @@
       "message": "Load 3 kW exceeds the 2 kW limit from 18:00 to 18:30."
     }
   ],
-  "verifier_version": "c0-power-only-3",
+  "verifier_version": "c0-power-allocator-7",
   "requirements": {
     "min_service_fraction": 1.0,
     "max_shift_hours": 3.0,
