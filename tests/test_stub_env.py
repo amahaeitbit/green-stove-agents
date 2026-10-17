@@ -5,7 +5,9 @@ import pytest
 
 from greenstove import scenarios as sc
 from greenstove.env_protocol import Environment, HouseholdRequest, load_environment
-from greenstove.stub_env import CHARGE_EFF, DISCHARGE_EFF, STUB_NAME, StubEnvironment
+from greenstove.models import UNSERVED_BUDGET, UNSERVED_CAPACITY, UNSERVED_REASONS
+from greenstove.pricing_agent import _adjust
+from greenstove.stub_env import CHARGE_EFF, DISCHARGE_EFF, STUB_NAME, STUB_VERSION, StubEnvironment
 
 ENV = StubEnvironment()
 TARIFF = {"standard": 8.0, "sun": 4.0, "peak": 13.0}
@@ -73,14 +75,64 @@ def test_overlapping_high_power_requests_shift_or_hit_inverter_limit():
     assert not trace.overload_steps and verdict.conditions[0].passed
     rigid = [req("a", 2.0, pref=48), req("b", 2.0, pref=48)]
     plan, _, verdict = run(ctx(rigid, essential=0.12))
-    assert [u.reason for u in plan.unserved] == ["INVERTER_LIMIT"]
-    assert any(f.code == "INVERTER_LIMIT" and f.request_id == "b" for f in verdict.feedback_codes)
+    assert [(u.request_id, u.reason) for u in plan.unserved] == [("b", UNSERVED_CAPACITY)]
+    # contract reason in the plan; the verifier keeps the price signal as INVERTER_LIMIT feedback
+    assert any(f.code == "INVERTER_LIMIT" and f.request_id == "b" and f.message == "no capacity left"
+               for f in verdict.feedback_codes)
 
 
 def test_budget_rejection():
     plan, _, verdict = run(ctx([req(power=1.0, max_cost=1.99)]))  # only start costs 2.00
-    assert plan.reservations == [] and plan.unserved[0].reason == "BUDGET_EXCEEDED"
+    assert plan.reservations == [] and plan.unserved[0].reason == UNSERVED_BUDGET
     assert {"BUDGET_EXCEEDED", "SERVICE_SHORTFALL"} <= {f.code for f in verdict.feedback_codes}
+    fb = next(f for f in verdict.feedback_codes if f.code == "BUDGET_EXCEEDED")
+    assert fb.request_id == "r1" and fb.message == "no affordable start"
+
+
+def test_two_pass_auto_bookers_before_pending_offers():
+    # pending "a" prefers an earlier start than auto-booker "b"; single-pass order would let
+    # the pending offer take the only capacity and leave the household that can cook unserved
+    rigid = [req("a", 2.0, pref=48, auto=False), req("b", 2.0, pref=48)]
+    plan, trace, _ = run(ctx(rigid, essential=0.12))
+    assert [(r.request_id, r.accepted) for r in plan.reservations] == [("b", True)]
+    assert [(u.request_id, u.reason) for u in plan.unserved] == [("a", UNSERVED_CAPACITY)]
+    assert trace.reservation_outcomes == {"p1:b": "completed"}
+    # within each pass the order stays (preferred_start, request_id)
+    mixed = [req("p2", pref=40, auto=False), req("p1", pref=40, auto=False),
+             req("z", pref=50), req("y", pref=44)]
+    order = [r.request_id for r in run(ctx(mixed))[0].reservations]
+    assert order == ["y", "z", "p1", "p2"]
+
+
+def test_duplicate_request_ids_raise_instead_of_unserved():
+    with pytest.raises(ValueError, match="duplicate request_id"):
+        ENV.allocate([req("a"), req("a")], TARIFF, ctx([req("a")]), "p1")
+
+
+@pytest.mark.parametrize("name", ["dev-clear-full", "dev-overcast-low-battery", "dev-rigid-high-demand"])
+def test_unserved_reasons_follow_shared_contract(name):
+    c = sc.scenario(name)
+    for i, t in enumerate(sc.lattice_tariffs(c)):
+        plan = ENV.allocate(c.requests, t, c, f"p{i}")
+        assert {u.reason for u in plan.unserved} <= set(UNSERVED_REASONS)
+        booked = {r.request_id for r in plan.reservations}
+        assert booked.isdisjoint(u.request_id for u in plan.unserved)
+        assert booked | {u.request_id for u in plan.unserved} == {r.request_id for r in c.requests}
+
+
+def test_unserved_feedback_still_steers_mock_pricing():
+    # budget miss -> BUDGET_EXCEEDED lowers the dear tier; capacity miss -> INVERTER_LIMIT spreads
+    lattice = {k: list(v) for k, v in sc.scenario("dev-clear-full").lattice.items()}
+    order = list(sc.scenario("dev-clear-full").tier_order)
+    base = {"standard": 8.0, "sun": 4.0, "peak": 13.0}
+    budget = run(ctx([req(power=1.0, max_cost=1.99)]), tariff=base)[2]
+    capacity = run(ctx([req("a", 2.0, pref=48), req("b", 2.0, pref=48)], essential=0.12),
+                   tariff=base)[2]
+    assert STUB_VERSION == budget.verifier_version == "stub-env-3"
+    for verdict in (budget, capacity):
+        codes = {f.code for f in verdict.feedback_codes}
+        assert not codes & set(UNSERVED_REASONS)          # pricing agent never sees UNSERVED_*
+        assert _adjust(base, codes, lattice, order) != base
 
 
 def test_household_prefers_cheaper_start_when_shift_is_worth_it():

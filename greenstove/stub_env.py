@@ -3,11 +3,16 @@
 A small deterministic stand-in so the agent layer can be built and demoed before the
 real world model lands. Deliberately simple rules:
 
-* Allocation: requests in (preferred_start, request_id) order; each household ranks
-  starts by quoted cost (integrated per interval across tiers) + shift_penalty * shift
-  hours, ties to the earliest start, skipping starts over max_cost. The best start that
-  keeps essential + cooking <= inverter_kw in every interval is reserved. Pending offers
-  (auto_book False) hold capacity but are never dispatched or counted as served.
+* Allocation: two passes like Abel's allocator -- auto-booking requests first, then
+  pending ones (auto_book False), each pass in (preferred_start, request_id) order. Each
+  household ranks starts by quoted cost (integrated per interval across tiers) +
+  shift_penalty * shift hours, ties to the earliest start, skipping starts over max_cost.
+  The best start that keeps essential + cooking <= inverter_kw in every interval is
+  reserved. Pending offers hold capacity left after the auto-bookers but are never
+  dispatched or counted as served. Unserved reasons follow the shared contract
+  (models.UNSERVED_REASONS): UNSERVED_BUDGET (no start is affordable) or UNSERVED_CAPACITY
+  (affordable, but no start fits the capacity left). Duplicate request_ids raise. The
+  protocol's allocate takes no requirements, so max_shift_hours is left to the verifier.
 * Simulation: PV serves essential load, then cooking; surplus charges the battery (95%)
   up to capacity, the rest is curtailed and counted. Deficits discharge it (95%). Cooking
   may not take the battery below reserve: the latest-started active session is
@@ -21,18 +26,23 @@ import json
 import math
 import uuid
 
-from greenstove.models import tariff_version as world_tariff_version
+from greenstove.models import (UNSERVED_BUDGET, UNSERVED_CAPACITY, UNSERVED_REASONS,
+                              ContractError, tariff_version as world_tariff_version)
 from greenstove.env_protocol import (Coverage, short_hash, 
     STEP_HOURS, STEPS, ActualScenario, Condition, Feedback, HouseholdRequest,
     InfeasibilityProof, Plan, Requirements, Reservation, ScenarioContext, Trace, Unserved,
     Verdict,
 )
 
-STUB_VERSION = "stub-env-2"
+STUB_VERSION = "stub-env-3"
 STUB_NAME = "stub-env (development stand-in, not Abel's simulator)"
 CHARGE_EFF = DISCHARGE_EFF = 0.95
 PHASES = ("forecast_expected", "forecast_downside", "actual")
 EPS = 1e-9
+# Unserved reason -> verifier feedback, so the pricing agent keeps its price signal.
+UNSERVED_FEEDBACK = {UNSERVED_BUDGET: ("BUDGET_EXCEEDED", "no affordable start"),
+                     UNSERVED_CAPACITY: ("INVERTER_LIMIT", "no capacity left")}
+assert set(UNSERVED_FEEDBACK) == set(UNSERVED_REASONS)
 
 
 def tariff_version(tariff: dict[str, float]) -> str:
@@ -66,31 +76,25 @@ class StubEnvironment:
         load = list(context.essential_load_kw)            # forecast interval load (kW)
         plan = Plan(proposal_id=proposal_id, tariff={k: float(v) for k, v in tariff.items()},
                     reservations=[], unserved=[])
-        seen: set[str] = set()
-        for req in sorted(requests, key=lambda r: (r.preferred_start, r.request_id)):
-            reason, chosen = None, None
+        ids = [r.request_id for r in requests]
+        dup = next((rid for rid in ids if ids.count(rid) > 1), None)
+        if dup is not None:
+            raise ContractError(f"duplicate request_id: {dup}")
+        # Auto-bookers first (False sorts before True), then pending; time order within each.
+        for req in sorted(requests, key=lambda r: (not r.auto_book, r.preferred_start, r.request_id)):
             last = min(STEPS, req.latest_finish) - req.duration_steps
-            starts = range(max(0, req.earliest_start), last + 1)
             ranked = []                                   # (score, start, cost), within budget
-            for s in starts:
+            for s in range(max(0, req.earliest_start), last + 1):
                 cost = session_cost(req, s, prices)
                 if cost <= req.max_cost + EPS:
                     shift_h = abs(s - req.preferred_start) * STEP_HOURS
                     ranked.append((round(cost + req.shift_penalty * shift_h, 9), s, cost))
             ranked.sort()
-            if req.request_id in seen:
-                reason = "DUPLICATE_RESERVATION"
-            elif not starts:
-                reason = "OUTSIDE_WINDOW"
-            elif not ranked:
-                reason = "BUDGET_EXCEEDED"
-            else:
-                fits = (x for x in ranked if all(load[t] + req.power_kw <= context.inverter_kw + EPS
-                                                 for t in range(x[1], x[1] + req.duration_steps)))
-                chosen = next(fits, None)
-                reason = None if chosen else "INVERTER_LIMIT"
-            seen.add(req.request_id)
-            if reason:
+            fits = (x for x in ranked if all(load[t] + req.power_kw <= context.inverter_kw + EPS
+                                             for t in range(x[1], x[1] + req.duration_steps)))
+            chosen = next(fits, None)
+            if chosen is None:
+                reason = UNSERVED_CAPACITY if ranked else UNSERVED_BUDGET
                 plan.unserved.append(Unserved(request_id=req.request_id, reason=reason))
                 continue
             _, s, cost = chosen
@@ -203,7 +207,9 @@ class StubEnvironment:
             empty = next((i for i, b in enumerate(trace.battery_kwh) if b <= EPS), None)
             fb.append(Feedback(code="ESSENTIAL_UNSERVED", interval=empty,
                                value=trace.unserved_essential_kwh, limit=rq.essential_unserved_kwh))
-        fb += [Feedback(code=u.reason, request_id=u.request_id) for u in plan.unserved]
+        fb += [Feedback(code=UNSERVED_FEEDBACK[u.reason][0], request_id=u.request_id,
+                        message=UNSERVED_FEEDBACK[u.reason][1])
+               for u in plan.unserved if u.reason in UNSERVED_FEEDBACK]
         fb += [Feedback(code="BUDGET_EXCEEDED", request_id=r.request_id, value=r.locked_cost,
                         limit=req[r.request_id].max_cost) for r in over_budget]
         fb += [Feedback(code="DUPLICATE_RESERVATION" if ids.count(r.request_id) > 1
