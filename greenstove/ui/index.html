@@ -761,7 +761,7 @@ function renderTools(){
       el('tbody',{},usage.map(u=>el('tr',{},el('td',{text:fmtAny(u.role)}),el('td',{text:fmtAny(u.mode)}),el('td',{class:'small',text:fmtAny(u.model)}),
         el('td',{class:'num',text:fmtAny(u.calls)}),el('td',{class:'num',text:fmtAny(u.prompt_tokens)+' / '+fmtAny(u.completion_tokens)}),
         el('td',{class:'num',text:fmtAny(u.cached_tokens)}),el('td',{class:'num',text:pct(u.cache_hit)}),
-        el('td',{class:'num',text:fmtAny(u.p50_ms)+' / '+fmtAny(u.p95_ms)}),el('td',{class:'num',text:typeof u.cost_usd==='number'?'$'+u.cost_usd.toFixed(4):fmtAny(u.cost_usd)})))))))
+        el('td',{class:'num',text:fmtAny(u.p50_ms)+' / '+fmtAny(u.p95_ms)}),el('td',{class:'num',text:typeof u.cost_usd==='number'?'$'+u.cost_usd.toFixed(4):fmtAny(u.cost_usd)}))))))
       :el('p',{class:'muted small',text:'No model calls yet.'}));
   const yk=$('#you-key');yk.textContent=yc.key_present?'key present':'no key';yk.className='chip '+(yc.key_present?'ok':'warn');
   if(yc.search)yk.title='search '+fmtAny(yc.search);
