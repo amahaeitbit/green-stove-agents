@@ -1,0 +1,183 @@
+/* Green-Stove presenter mode: high-visibility styles for a projector or shared screen.
+   Loaded after index.html's own <style>. Everything that restyles the page is scoped under
+   body.presenter, so the default view is unchanged. Only the elements present.js adds
+   (#gs-presenter-toggle, .gs-kbd) have styles outside presenter mode.
+   Hooks: #gs-hero (.ok .bad .warn .purple; status word = .gs-word or the first child;
+   tiles .gs-tile > .v + .k, optional row .gs-tiles), #gs-steps > .gs-step(.done .current),
+   number badge .gs-step > .n, .gs-flash, #gs-presenter-toggle, .gs-kbd,
+   and tone overrides .gs-tone-ok .gs-tone-bad .gs-tone-warn .gs-tone-purple for chips whose
+   status the page cannot express by class (APPROVAL_REQUIRED is .chip.info, INFEASIBLE is .chip.bad). */
+
+/* ---------- stronger tokens (existing variables, presenter values) ---------- */
+body.presenter{--muted:#3a424d;--line:#c2c8d0;font-size:17px;line-height:1.5}
+@media (prefers-color-scheme: dark){
+  body.presenter{--muted:#c3ccd6;--line:#3e4754}
+}
+
+/* ---------- type ---------- */
+body.presenter h1{font-size:26px;font-weight:800}
+body.presenter h2{font-size:22px;font-weight:800}
+body.presenter h3{font-size:18.5px;font-weight:750}
+body.presenter h4{font-size:14px;font-weight:800;letter-spacing:.07em;margin:20px 0 8px}
+body.presenter p{margin:8px 0}
+body.presenter code,body.presenter pre,body.presenter .mono{font-size:14.5px}
+body.presenter .small{font-size:14.5px}
+body.presenter .hint{font-size:13.5px}
+body.presenter label.field{font-size:14.5px}
+body.presenter label.field>select,body.presenter label.field>input,body.presenter label.field>textarea{font-size:16.5px}
+body.presenter .panel-head .sub{font-size:14.5px}
+body.presenter .placeholder{font-size:16px;border-width:2px}
+body.presenter .loading{font-size:15.5px}
+body.presenter .facts{font-size:14.5px}
+body.presenter .ticks{font-size:12.5px}
+body.presenter .legend{font-size:13.5px}
+body.presenter .legend i{width:12px;height:12px}
+body.presenter .switch{font-size:14.5px}
+body.presenter .bubble{font-size:15.5px;padding:11px 13px}
+body.presenter .bubble .who{font-size:13.5px}
+body.presenter .flow{gap:6px}
+body.presenter .flow .arrow{font-size:16px;font-weight:800}
+body.presenter .stat .k{font-size:13.5px}
+body.presenter .stat .v{font-size:22px;font-weight:800}
+body.presenter summary{font-size:15.5px}
+body.presenter .entry .sit{font-size:15.5px}
+body.presenter .kv{font-size:15.5px}
+body.presenter .check{font-size:15.5px}
+body.presenter .toast{font-size:15.5px;border-left-width:6px}
+body.presenter :focus-visible{outline:3px solid var(--focus);outline-offset:3px}
+
+/* ---------- layout, cards, spacing ---------- */
+body.presenter header.top{border-bottom-width:2px}
+body.presenter .top-inner{padding:12px 16px}
+body.presenter main{gap:22px;padding-top:20px}
+body.presenter .panel{border-width:2px;padding:22px}
+body.presenter .panel-head{margin-bottom:14px}
+body.presenter .card,body.presenter .sub-card{border-width:2px;padding:16px}
+body.presenter .hh-list{gap:14px}
+body.presenter .stat-row{gap:10px}
+body.presenter .stat{padding:10px 12px}
+body.presenter .bar{height:26px}
+body.presenter .bar .seg.win{font-size:12.5px}
+body.presenter .entries{max-height:60vh;gap:8px}
+body.presenter .entry{border-width:2px;padding:10px 12px}
+body.presenter dialog.drawer{width:min(680px,100%)}
+body.presenter select,body.presenter input[type=text],body.presenter input[type=number],body.presenter input[type=date],body.presenter textarea{border-width:2px;min-height:40px}
+body.presenter .banner{font-size:15.5px;font-weight:700;border-top:2px solid var(--warn)}
+body.presenter .status-line{font-size:15.5px;padding:10px 14px}
+body.presenter .status-line.ok{box-shadow:inset 6px 0 0 var(--ok)}
+body.presenter .status-line.warn{box-shadow:inset 6px 0 0 var(--warn)}
+
+/* ---------- buttons ---------- */
+body.presenter .btn{font-size:16px;min-height:42px;padding:8px 15px;border-width:2px}
+body.presenter .btn.sm{font-size:14.5px;min-height:36px;padding:5px 12px}
+body.presenter .btn.busy::before{width:15px;height:15px;border-width:3px}
+body.presenter .controls>.btn{margin-top:24px}
+body.presenter #btn-run{font-size:19px;font-weight:800;min-height:54px;padding:12px 26px;border-radius:12px;letter-spacing:.01em;
+  background:var(--accent);border-color:var(--accent);color:var(--accent-ink);
+  box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 30%,transparent),0 6px 18px rgba(0,0,0,.2)}
+body.presenter .controls>#btn-run{margin-top:18px}
+body.presenter #btn-run:hover{filter:brightness(1.1)}
+body.presenter #btn-run[disabled]{opacity:.85}
+
+/* ---------- tables: larger cells, zebra rows, sticky header inside .tw ---------- */
+body.presenter .tw{border-width:2px;max-height:60vh;overflow:auto}
+body.presenter table{font-size:15.5px}
+body.presenter th,body.presenter td{padding:9px 12px}
+body.presenter th{font-size:14px;font-weight:800;color:var(--ink);background:var(--line)}
+body.presenter .tw thead th{position:sticky;top:0;z-index:1;box-shadow:inset 0 -2px 0 var(--muted)}
+body.presenter td.wrap{min-width:200px}
+body.presenter tbody tr:nth-child(even) td{background:var(--mut-bg)}
+body.presenter tbody tr.chosen td{background:var(--ok-bg);font-weight:700}
+
+/* ---------- chips and badges: bigger, bold, strong fills ---------- */
+body.presenter .chips{gap:7px}
+body.presenter .chip{font-size:14px;font-weight:750;padding:3px 11px;line-height:1.6;color:var(--ink);max-width:100%}
+body.presenter .chip.ok{background:var(--ok);color:var(--panel)}       /* PASS, PLAN_VERIFIED, COMPLETED, admitted, booked */
+body.presenter .chip.bad{background:var(--bad);color:var(--panel)}     /* FAIL, rejected, NOT_SERVED (INFEASIBLE too unless tagged) */
+body.presenter .chip.warn{background:var(--warn);color:var(--panel)}   /* DEFER, pending, WAIT */
+body.presenter .chip.info{background:var(--info-bg);color:var(--info);box-shadow:inset 0 0 0 2px var(--info)}
+body.presenter .badge{font-size:14.5px;font-weight:800;padding:4px 11px;color:var(--ink)}
+body.presenter .badge.mock{background:var(--warn);color:var(--panel)}
+body.presenter .badge.live{background:var(--ok);color:var(--panel)}
+/* tone overrides present.js may add from a chip's text */
+body.presenter .gs-tone-ok,body.presenter .chip.gs-tone-ok,body.presenter .badge.gs-tone-ok{background:var(--ok);color:var(--panel);box-shadow:none}
+body.presenter .gs-tone-bad,body.presenter .chip.gs-tone-bad,body.presenter .badge.gs-tone-bad{background:var(--bad);color:var(--panel);box-shadow:none}
+body.presenter .gs-tone-warn,body.presenter .chip.gs-tone-warn,body.presenter .badge.gs-tone-warn{background:var(--warn);color:var(--panel);box-shadow:none}
+body.presenter .gs-tone-purple,body.presenter .chip.gs-tone-purple,body.presenter .badge.gs-tone-purple{background:var(--c4);color:var(--panel);box-shadow:none}
+
+/* ---------- #gs-hero: summary banner under the top bar ---------- */
+body:not(.presenter) #gs-hero,body:not(.presenter) #gs-steps{display:none}
+body.presenter #gs-hero{display:flex;flex-wrap:wrap;align-items:center;gap:14px 22px;width:calc(100% - 32px);max-width:1568px;margin:18px auto 0;
+  padding:18px 22px;background:var(--panel);color:var(--ink);border:2px solid var(--line);border-left-width:10px;border-radius:var(--radius);box-shadow:var(--shadow);min-width:0}
+body.presenter main>#gs-hero,body.presenter main>#gs-steps{grid-column:1/-1;width:auto;max-width:none;margin:0}
+body.presenter #gs-hero>:first-child:not(.gs-tile):not(.gs-tiles),body.presenter #gs-hero .gs-word{flex:0 1 auto;min-width:0;font-size:clamp(28px,5.2vw,56px);font-weight:850;line-height:1.05;letter-spacing:.01em;overflow-wrap:anywhere}
+body.presenter #gs-hero .gs-tiles{display:flex;flex-wrap:wrap;gap:12px;flex:1 1 420px;min-width:0}
+body.presenter #gs-hero>:has(>.gs-tile){display:flex;flex-wrap:wrap;gap:12px;flex:1 1 420px;min-width:0}
+body.presenter .gs-tile{flex:1 1 130px;min-width:0;background:var(--panel);color:var(--ink);border:2px solid var(--line);border-radius:12px;padding:10px 14px}
+body.presenter .gs-tile .v{font-size:clamp(24px,3.4vw,40px);font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+body.presenter .gs-tile .k{margin-top:3px;font-size:14px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;overflow-wrap:anywhere}
+body.presenter .gs-tile.ok .v{color:var(--ok)}
+body.presenter .gs-tile.bad .v{color:var(--bad)}
+body.presenter .gs-tile.warn .v{color:var(--warn)}
+body.presenter #gs-hero.ok{border-color:var(--ok);background:var(--ok-bg)}
+body.presenter #gs-hero.bad{border-color:var(--bad);background:var(--bad-bg)}
+body.presenter #gs-hero.warn{border-color:var(--warn);background:var(--warn-bg)}
+body.presenter #gs-hero.purple{border-color:var(--c4)}
+body.presenter #gs-hero.ok>:first-child:not(.gs-tile):not(.gs-tiles),body.presenter #gs-hero.ok .gs-word{color:var(--ok)}
+body.presenter #gs-hero.bad>:first-child:not(.gs-tile):not(.gs-tiles),body.presenter #gs-hero.bad .gs-word{color:var(--bad)}
+body.presenter #gs-hero.warn>:first-child:not(.gs-tile):not(.gs-tiles),body.presenter #gs-hero.warn .gs-word{color:var(--warn)}
+body.presenter #gs-hero.purple>:first-child:not(.gs-tile):not(.gs-tiles),body.presenter #gs-hero.purple .gs-word{color:var(--c4)}
+
+/* ---------- #gs-steps: horizontal guide strip ---------- */
+body.presenter #gs-steps{display:flex;flex-wrap:wrap;gap:8px;list-style:none;width:calc(100% - 32px);max-width:1568px;margin:12px auto 0;padding:0;min-width:0}
+body.presenter #gs-hero>#gs-steps{flex:1 1 100%;width:100%;margin:0}
+body.presenter .gs-step{flex:1 1 150px;min-width:0;display:flex;align-items:center;gap:8px;margin:0;padding:9px 12px;border:2px solid var(--line);border-radius:12px;
+  background:var(--panel);color:var(--muted);font-size:15px;font-weight:650;line-height:1.3;overflow-wrap:anywhere;text-align:left}
+body.presenter .gs-step.done{border-color:var(--ok);background:var(--ok-bg);color:var(--ok)}
+body.presenter .gs-step.current{border-color:var(--accent);background:var(--accent);color:var(--accent-ink);font-weight:800;
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 30%,transparent)}
+body.presenter .gs-step>.n,body.presenter .gs-step>.num{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:1.9em;height:1.9em;border-radius:50%;
+  background:var(--mut-bg);color:var(--ink);font-weight:800;font-variant-numeric:tabular-nums}
+body.presenter .gs-step.done>.n,body.presenter .gs-step.done>.num{background:var(--ok);color:var(--panel)}
+body.presenter .gs-step.current>.n,body.presenter .gs-step.current>.num{background:var(--accent-ink);color:var(--accent)}
+
+/* ---------- .gs-flash: 1.6 s highlight pulse ---------- */
+@keyframes gs-flash{
+  0%{outline-color:var(--accent);box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 60%,transparent)}
+  35%{outline-color:var(--accent);box-shadow:0 0 0 10px color-mix(in srgb,var(--accent) 28%,transparent)}
+  100%{outline-color:transparent;box-shadow:0 0 0 18px transparent}
+}
+@keyframes gs-flash-calm{
+  0%,80%{outline-color:var(--accent)}
+  100%{outline-color:transparent}
+}
+body.presenter .gs-flash{outline:3px solid transparent;outline-offset:3px;animation:gs-flash 1.6s ease-out}
+@media (prefers-reduced-motion: reduce){
+  body.presenter .gs-flash{animation:gs-flash-calm 1.6s linear}
+}
+
+/* ---------- elements visible in both modes ---------- */
+#gs-presenter-toggle{position:fixed;right:16px;bottom:16px;z-index:55;display:inline-flex;align-items:center;gap:6px;min-height:36px;max-width:calc(100vw - 32px);
+  padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--ink);font-size:13px;font-weight:650;line-height:1.3;
+  box-shadow:0 4px 14px rgba(0,0,0,.18);cursor:pointer;opacity:.92}
+#gs-presenter-toggle:hover{opacity:1;border-color:var(--muted)}
+#gs-presenter-toggle:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+body.presenter #gs-presenter-toggle{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-size:15px;opacity:1}
+body:has(#gs-presenter-toggle) #toasts{bottom:64px}
+.gs-kbd{display:inline-flex;align-items:center;justify-content:center;min-width:1.7em;padding:0 6px;border:1px solid var(--line);border-bottom-width:3px;border-radius:6px;
+  background:var(--panel);color:var(--ink);font-family:var(--mono);font-size:12px;font-weight:700;line-height:1.6;white-space:nowrap}
+body.presenter .gs-kbd{font-size:14px}
+body.presenter #gs-presenter-toggle .gs-kbd{background:transparent;color:inherit;border-color:currentColor}
+
+/* ---------- phone width: no horizontal page scroll ---------- */
+@media (max-width:760px){
+  body.presenter h1{font-size:21px}
+  body.presenter .controls>.btn,body.presenter .controls>#btn-run{margin-top:0}
+  body.presenter #btn-run{flex:1 1 100%;justify-content:center}
+  body.presenter .panel{padding:16px}
+  body.presenter .chip{white-space:normal;overflow-wrap:anywhere}
+  body.presenter nav.tabs button{font-size:15px;padding:8px 12px}
+  body.presenter #gs-hero{padding:14px 16px;border-left-width:8px}
+  body.presenter .gs-step{flex-basis:130px}
+  body.presenter td.wrap{min-width:160px}
+}
