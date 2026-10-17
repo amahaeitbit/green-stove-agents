@@ -36,7 +36,7 @@ function num(v){
 function visible(n){try{return !!(n&&n.getClientRects&&n.getClientRects().length);}catch(e){return false;}}
 
 /* ---------- presenter mode ---------- */
-function readPref(){try{return window.localStorage.getItem(STORE_KEY)==='1';}catch(e){return false;}}
+function readPref(){try{return window.localStorage.getItem(STORE_KEY)!=='0';}catch(e){return true;}}
 function writePref(on){try{window.localStorage.setItem(STORE_KEY,on?'1':'0');}catch(e){}}
 function isPresenter(){try{return document.body.classList.contains('presenter');}catch(e){return false;}}
 function setPresenter(on,save){
@@ -55,7 +55,7 @@ function togglePresenter(){setPresenter(!isPresenter(),true);}
 function statusKind(status){
   var s=String(status||'').toUpperCase();
   if(s==='PLAN_VERIFIED')return 'ok';
-  if(s==='INFEASIBLE')return 'warn';
+  if(s==='INFEASIBLE')return 'purple';
   if(s==='NO_VERIFIED_PLAN'||s==='ERROR'||s.indexOf('ERROR')>=0||s.indexOf('FAIL')>=0)return 'bad';
   return 'warn';
 }
@@ -75,7 +75,7 @@ function bookedCount(bookings){
 function renderHero(){
   try{
     if(!hero)return;
-    hero.classList.remove('ok','bad','warn');
+    hero.classList.remove('ok','bad','warn','purple');
     heroTiles.replaceChildren();
     heroTrail.textContent='';
     heroSub.textContent='';
@@ -184,7 +184,7 @@ function buildSteps(){
   STEPS.forEach(function(st,i){
     var b=mk('button','gs-step');
     b.type='button';
-    b.appendChild(mk('span','gs-step-n',String(i+1)));
+    b.appendChild(mk('span','gs-step-n n',String(i+1)));
     b.appendChild(document.createTextNode(' '+st.label));
     b.addEventListener('click',function(){goStep(i);});
     stepsBox.appendChild(b);
