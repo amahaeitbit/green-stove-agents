@@ -6,6 +6,7 @@ behavior on one illustrative scenario; the evaluation table is the evidence.
 """
 from __future__ import annotations
 
+import json
 import time
 from pathlib import Path
 
@@ -297,6 +298,27 @@ def main(a) -> int:
     run = None
     override = None
     facts: dict = {"rows": [], "calls": []}
+    snap: dict = {"meta": {"stamp": stamp, "mode": llm.s.mode, "model": llm.s.public("pricing")["model"],
+                           "world": env.name, "goal": dod.goal},
+                  "spec": {**dod.model_dump(mode="json"), "spec_hash": dod.spec_hash()}}
+
+    def traces_for(ctx, r, actual=None):
+        """Re-simulate the run's selected plan per phase for charts (same deterministic world)."""
+        if not r.selected_tariff:
+            return {}
+        plan = env.allocate(env.household_requests(ctx), r.selected_tariff, ctx, r.selected_proposal_id or "")
+        out = {"plan": plan.model_dump(mode="json")}
+        for ph in ("forecast_expected", "forecast_downside"):
+            try:
+                out[ph] = env.simulate(plan, ctx, ph).model_dump(mode="json")
+            except Exception:  # noqa: BLE001 - a world may not model a phase
+                pass
+        if actual is not None:
+            try:
+                out["actual"] = env.simulate(plan, ctx, "actual", actual).model_dump(mode="json")
+            except Exception:  # noqa: BLE001
+                pass
+        return out
     for scene in scenes:
         act_header(c, scene)
         if scene == "goal":
@@ -307,6 +329,7 @@ def main(a) -> int:
                                   f"{src.count('code_added')} added by code (spec {dod.spec_hash()[:8]})"))
         elif scene == "world":
             show_world(c, pctx)
+            snap["world"] = {"context": pctx.model_dump(mode="json")}
         elif scene == "tomorrow":
             if forecast is None:
                 c.print("[yellow]no forecast available; skipping[/]")
@@ -318,6 +341,8 @@ def main(a) -> int:
                                               write_notes=False, dod=dod)
                 facts["calls"] += tr.calls
                 show_run(c, tctx, tr, env, eff, details=False)
+                snap["tomorrow"] = {"forecast": forecast.model_dump(mode="json"), "context": tctx.model_dump(mode="json"),
+                                    "run": tr.model_dump(mode="json"), "traces": traces_for(tctx, tr)}
                 facts["rows"].append(("You.com + Nemotron", "real-world input the agents plan on",
                                       f"{forecast.place} {forecast.date}: {forecast.weather_class}, PV {forecast.pv_kwh} kWh "
                                       f"(downside {forecast.downside_pv_kwh}), {forecast.status}, search {forecast.search_mode}; "
@@ -328,6 +353,8 @@ def main(a) -> int:
                                                actual=make_actual(pctx, seed=pctx.day + 7), dod=dod)
             if scene == "proposal":
                 show_run(c, pctx, run, env, eff)
+                snap["proposal"] = {"context": pctx.model_dump(mode="json"), "run": run.model_dump(mode="json"),
+                                    "traces": traces_for(pctx, run, make_actual(pctx, seed=pctx.day + 7))}
                 facts["calls"] += run.calls
                 facts["rows"].append(("Done Means Done", "checks its work, catches drift and loops, decides",
                                       f"{len(run.attempts)} attempts judged by the verifier; decisions "
@@ -345,6 +372,11 @@ def main(a) -> int:
                     res = keeper.admit(fake, evidence, cfg, brain)
                     c.print(f"[magenta]TEST INJECTION[/] fabricated note -> [bold]{res.action}[/]: {escape('; '.join(res.reasons))}")
                 c.print(f"brain now: {len(brain.entries())} entries · snapshot {brain.snapshot_hash()[:8]}")
+                snap["memory"] = {"notes": [n.model_dump(mode="json") for n in run.notes],
+                                  "fabricated": ({"description": fake.description, **res.model_dump(mode="json")}
+                                                 if recs else None),
+                                  "entries": [e.model_dump(mode="json") for e in brain.entries()],
+                                  "snapshot": brain.snapshot_hash()}
                 added = [n for n in run.notes if n.action in ("added", "confirmed", "kept_separate")]
                 facts["rows"].append(("Shared Brain", "updated afterward, kept current and conflict-free",
                                       f"{len(added)} evidence-backed observations admitted; fabricated note "
@@ -360,6 +392,9 @@ def main(a) -> int:
                     show_run(c, hctx, r, env, eff, details=False)
             c.print()
             bars(c, [("No memory", rows[0][1]), ("Shared Brain", rows[1][1])])
+            snap["handoff"] = {"context": hctx.model_dump(mode="json"),
+                               "off": rows[0][1].model_dump(mode="json"), "curated": rows[1][1].model_dump(mode="json"),
+                               "traces": traces_for(hctx, rows[1][1])}
             off, cur = rows[0][1], rows[1][1]
             diff = len(off.calls) - len(cur.calls)
             override = ("Shared Brain: the new agent read the memory, cited it, and needed "
@@ -380,11 +415,15 @@ def main(a) -> int:
             for line in p.get("assumptions", []):
                 c.print(f"  · {line}")
             c.print("decisions: " + " → ".join(d.decision for d in r.decisions))
+            snap["infeasible"] = {"context": ictx.model_dump(mode="json"), "run": r.model_dump(mode="json")}
             facts["rows"].append(("Done Means Done", "stops honestly, pings a human rarely",
                                   f"needs ≥ {p.get('lower_bound_kwh', 0):.2f} kWh vs ≤ {p.get('available_kwh', 0):.2f}; "
                                   f"INFEASIBLE with 0 model calls → ping_human"))
         elif scene == "improve":
             info = show_improvement(c, cli.data_dir() / "playbook")
+            pb = cli.data_dir() / "playbook"
+            snap["improve"] = {"index": (json.loads((pb / "index.json").read_text()) if (pb / "index.json").exists() else None),
+                               "before_after_md": ((pb / "before-after.md").read_text() if (pb / "before-after.md").exists() else None)}
             facts["rows"].append(("Version N+1", "keeps a change only if it measurably helps; unseen tasks",
                                   f"{info.get('versions', 0)} playbook versions with keep/reject decisions; "
                                   "before/after on held-out days" if info else "run `gsa evolve` before the demo"))
@@ -396,8 +435,12 @@ def main(a) -> int:
             input("[Enter] next act ")
     if a.scene == "all":
         receipt(c, facts, llm)
+        snap["receipt"] = {"rows": [list(r) for r in facts["rows"]], "calls": len(facts["calls"]),
+                           "tokens": sum(x.prompt_tokens + x.completion_tokens for x in facts["calls"]),
+                           "cost_usd": sum(x.cost_usd or 0 for x in facts["calls"])}
     out_dir.mkdir(parents=True, exist_ok=True)
     path = out_dir / f"demo-{llm.s.mode}-{stamp}.txt"
+    (out_dir / f"demo-{llm.s.mode}-{stamp}.json").write_text(json.dumps(snap, indent=1, default=str))
     c.save_text(str(path))
     c.print(f"recorded transcript: {path}")
     return 0
