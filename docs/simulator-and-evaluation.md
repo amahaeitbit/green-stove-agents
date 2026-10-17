@@ -1,98 +1,87 @@
-# Simulator and evaluation
+# Simulator and evaluation protocol
 
-All numbers below are placeholders listed in [assumptions.md](assumptions.md) and live in
-config files.
+Status: protocol to implement. [PLAN.md](../PLAN.md) fixes ownership and scope; [contracts.md](contracts.md) fixes interfaces. Abel owns scoring. Do not edit thresholds or test cases after observing held-out results.
 
-## Grid simulator
+## The question
 
-- **Time:** 96 steps of 15 minutes, 00:00–24:00, village time zone. Battery state carries
-  over between consecutive days in multi-day runs.
-- **Per station, per step:**
-  - `pv_kw = pv_kwp × derate × clear_sky(t) × cloud(t)`
-  - `load_kw = Σ active stoves × stove_kw × jitter + clinic loads not shed`
-  - If `load_kw > inverter_kw`, the inverter trips for the step: every running cooking
-    session is interrupted (finished on wood) and the clinic is dark for that step.
-  - Battery: charge or discharge the net with round-trip efficiency; SoC bounded
-    `[0, 1]`. At `hw_lvd_soc` the hardware disconnects every load, clinic included, until
-    SoC recovers by 5 points.
-  - Approved genset hours add up to `genset_kw`; litres burned are counted.
-  - Clinic tiers: tier 3 is shed automatically below the cooking reserve; tier 2 only with
-    an approved `clinic_shed`; tier 1 is never shed by software.
-- **Cooking session:** `session_minutes` at `stove_kw` (electric pressure cooker). A
-  session needs all its steps powered; an interruption means the meal is finished on wood.
+Does a curated shared brain help a fresh agent reach an acceptable tariff with less total planning effort than raw history, tariff reuse, or deterministic search, at comparable service and unchanged constraints?
 
-## Weather
+A positive result is not assumed. Distinguish memory benefit within the LLM system from evidence that LLM planning is preferable to deterministic methods.
 
-Day classes: `clear`, `partly_cloudy`, `overcast`, `rainy_afternoon` (clear morning,
-clouds after about 13:00, the rainy-season pattern). Each day is generated from a seed:
-hourly cloud factors from an AR(1) process around the class mean. The **forecast** is the
-actual day smoothed plus a biased error; the **downside scenario** is the forecast times
-`downside_factor`. Seeds 0–99 are development days (used for building, debugging and
-federation warm-up). Seeds 1000–1019 are unseen evaluation days and are not run during
-development.
+## Simulator
 
-## Households and demand response
+Use one synthetic station and 96 fifteen-minute intervals. Include inverter limit, PV supply, fixed essential load, battery energy capacity, initial charge, charge/discharge power limits, separate efficiencies and reserve floor. Use per-household power and duration. Track deficits explicitly; clipping battery state is not a way to erase unserved energy. Invertibility, PV curtailment, and other approximations must be documented.
 
-Synthetic households (seeded) with a language, a priority flag, two electric meals a day
-(lunch, dinner), a preferred start, a window (dinner can move earlier because the pressure
-cooker keeps food warm), a delay cost per hour, a price sensitivity, a patience in minutes
-and a compliance probability. Under a tariff each household requests the slot that
-minimizes `price × meal_kwh × sensitivity + delay_cost × |shift|`. Compliant households
-cook in their granted slot; the rest arrive at their own requested slot as walk-ins.
+For each tariff, deterministic households rank acceptable cooking starts and the same deterministic allocator forms reservations. Quotes integrate consumption through tariff intervals. The verifier recomputes trace totals and fixed conditions. All conditions use identical physics and allocation.
 
-## Policies compared
+Planning uses expected and downside forecasts. The planner never sees actual future PV. A chosen plan is then replayed on actual simulated weather, with essential-load protection and unserved cooking counted. Never call a forecast pass an actual execution pass. Independent scenarios reset initial battery/request state; multi-day state carryover is outside the headline experiment.
 
-| Policy | Tariff | Safety limits | Verification | Replanning |
-| --- | --- | --- | --- | --- |
-| `fcfs` | Flat standard price | Nameplate cap `floor(inverter_kw / stove_kw)`, hardware LVD only | none | none |
-| `llm_oneshot` | Model proposes tariff **and** cap and reserve, once | as proposed | none | none |
-| `agents_no_verifier` | Model tariff, once | code-derived limits | none | none |
-| `agents` | Model tariff, loop | code-derived limits | Verifier + Supervisor | hourly drift replans |
+Test energy balance, efficiency, battery power and reserve, overloaded intervals, essential deficits, heterogeneous loads, duplicate bookings, acceptance, budgets, windows and quote arithmetic against hand-calculated fixtures.
 
-`agents_no_verifier` separates what code-derived safety limits buy from what the
-verify-and-relax loop buys.
+## Development, memory and frozen evaluation
 
-## Shared Brain modes (the headline comparison)
+Development seeds: reserve a named range such as 0-99. Held-out seeds: a disjoint named range such as 1000 onward. At C0 define factors and their plausible synthetic ranges: weather class, initial battery, total demand and household flexibility. Hold out some combinations, not merely alternate seeds of the same exact day. Avoid adding tasks only to force the brain to win.
 
-| Mode | What agents read before each call |
-| --- | --- |
-| `off` | Facts only; every day starts from zero |
-| `dump` | Facts plus previous attempts and reports appended, up to the same token budget |
-| `on` | Keeper-curated role briefs |
+Development produces one common evidence library, including successful and failed proposals. Curation may select and summarize supported observations. The raw-history and curated modes have the same underlying source evidence and the same memory token allowance, initially 600 tokens. Current facts are identical. Fix raw-history truncation order on development data; do not deliberately fill it with irrelevant padding.
 
-Warm up on development days 0–19 of village A, evaluate on unseen days 1000–1019, then run
-village B days 1–5 with village A's federated brain versus an empty one. Report
-first-attempt verified pass rate, attempts and model calls to a verified plan,
-relaxations, wood meals, max delay, SMS checker block rate, parser fallback rate, tokens
-per day, brief and store size, stale entries served (must be 0), and notes admitted,
-rejected and superseded.
+At C4 freeze evidence/history/brain snapshots, model/settings, prompts, seed manifest, configuration, factor ranges, candidate prices, baseline distance and order, all thresholds and scoring. Hash them. Evaluation outcomes cannot update the brain. Post-run Note-writer outputs, if collected, are quarantined and not served. Disable them uniformly or report their overhead separately.
 
-## Metrics (per day; report mean and worst day, overall and per weather class)
+## Six conditions
+
+| ID | Method | Historical input | Candidate budget |
+| --- | --- | --- | --- |
+| A | Facts only LLM | None beyond current facts | At most 3 candidate attempts |
+| B | Raw-history LLM | Bounded development history | Same as A |
+| C | Curated-brain LLM | Scoped approved observations | Same as A |
+| D | Last verified tariff | Most recent verified development tariff | 1 candidate; no LLM |
+| E | Nearest-context reuse | Same successful development tariffs available to C | 1 candidate; no LLM |
+| F | Deterministic tariff search | Same current inputs; fixed finite price lattice | Record first 3 candidates and full configured search |
+
+For E, define fixed normalized distance using forecast energy/profile summaries, starting battery fraction, demand energy, peak requested power, and flexibility. Fix weights/scales before evaluation. Reject configuration-incompatible entries. Choose the nearest verified candidate with deterministic tie-breaking. If no compatible candidate exists or verification fails, record that failure without an unmatched fallback.
+
+For F, use the same lattice available to LLM proposals, never a weaker action space. A small lattice, for example three allowed levels per tier before validity filtering, permits at most 27 triples. Validate committee bounds and tier ordering. Freeze the order using development data. Stop at the first acceptable candidate for the effort metric; a separate full-search outcome can report best service under a fixed selection rule. Report budget-3 and full-search results so differences in candidate budget remain visible. No gold actual weather is available to the search.
+
+Prefer a feasibility-first, explicitly ordered candidate-selection rule shared with the agent loop. Freeze any tie-breaking between acceptable plans. Do not use an evaluator objective unavailable to another method.
+
+## Resource accounting
+
+Define one candidate evaluation as allocating a tariff and checking both forecast scenarios. Also count underlying simulator executions, actual-day replay, invalid proposals, model repairs, Note-writer calls, memory construction, tokens, latency and billed cost separately. Stop-on-first-success rules must be consistent and documented.
+
+D/E/F use zero inference calls, so LLM call reduction is not a useful claim against them. Compare candidate/simulator evaluations, end-to-end time, inference plus compute cost where measured, and service. Report curation/warm-up overhead separately; no claim of net savings without accounting for it or explaining amortization.
+
+A/B/C use identical model/settings, current facts, attempt budgets, feedback format and shared prompts except memory input. Any repair counts toward the call budget; invalid proposals consume an attempt. A fresh agent request starts each scenario. Fix a low supported temperature but do not claim determinism. Interleave modes or rotate their order to reduce timing bias.
+
+Cache keys include full inputs, role, mode, model/settings, prompt hash, configuration and memory snapshot. Cached replay is not a new independent measurement. Never share one mode's generated answer with another.
+
+## Metrics
+
+Report counts and denominators alongside percentages. Suggested sample: 8-12 held-out days, sized from actual development latency and cost. Small single-run results are descriptive, not proof of statistical significance.
 
 | Metric | Definition |
 | --- | --- |
-| Wood meals per day | Meals not cooked electric: deferred, abandoned after patience, or interrupted |
-| Collection hours avoided | `(all-wood meals − wood meals) × collection_hours_per_wood_meal` |
-| Max meal delay | Largest `granted − requested` start among electric meals, minutes |
-| Household spend | Mean and max per household per day, after lifeline pricing |
-| Revenue vs. target | Day revenue ÷ `revenue_target_per_day` |
-| Station overload minutes | Sum over stations of minutes with a trip |
-| Clinic outage hours | Tier-1 unpowered time; tier-2 reported separately |
-| Trees verified | Trees with two verifications posted in the ledger |
-| Token cost per day | Tokens in and out per village-day, and USD when prices are set |
-| Also reported | Model calls per day, attempts to a verified plan, relaxations, human pings, genset litres, SMS blocked by the checker |
+| Verified-plan success | Days where fixed requirements pass under both forecasts, divided by all days |
+| First-candidate pass | First candidate passes; D/E have only one candidate |
+| Calls/tokens/cost per day | All attempted days, including failures; separate one-time memory construction |
+| Candidate/simulator evaluations | Planning effort, with search budget-3 and full-search distinguished |
+| Meals completed | Actual execution-completed sessions over total requested sessions; also show worst day |
+| Household service | Per-household completed/requested sessions; expose households with no service |
+| Inconvenience | Absolute accepted-start minus preferred-start; report max and mean |
+| Late finishes | Count and duration beyond specified limits; hard-window violations fail |
+| Spend | Mean/max household spend and budget violations; no averaging away violations |
+| Execution violations | Essential unserved energy/time, reserve breaches, inverter/power violations |
+| Memory hygiene | Unsupported, stale, superseded or incompatible entries actually served; admission rejections separately |
+| Repeated failed proposals | Repeated exact tariff hashes within a run; partial similarity is optional |
 
-## Protocol
+Record reason-coded unserved requests. Do not include only successful days in effort metrics. Disable relaxations in all headline conditions. Operational constraints include essential load, capacity, reserve, windows and budgets; service floor and inconvenience tolerance are fixed in the manifest using development requirements.
 
-1. Same households, same unseen days and same random draws for every policy.
-2. Mock mode for all 20 days; live Nemotron for 3 of them, brain on and off (milestone 8).
-   Results say which.
-3. Success for the project: on unseen days, `agents` has zero overload minutes and zero
-   tier-1 outage on every day, fewer wood meals than `fcfs`, and never reports `DONE` on a
-   day where a condition failed in execution. Anything short of that is reported as it is.
+## Results table and interpretation
 
-## Threats to validity
+One row per A-F, with separate F budget-3/full rows. Columns: verified n/N; first-candidate n/N; calls; tokens; candidate checks; wall time; completed meals; worst-day service; maximum time shift; household spend; actual violations; memory hygiene. Attach per-day evidence so means cannot conceal a bad day.
 
-Synthetic households and weather; no calibration against pilot data unless it is supplied;
-mock mode replaces the model with rules; SMS compliance is a parameter, not a measurement;
-the pilot config (6 households, 1.8 kW) is the only link to real operation.
+A positive memory claim requires comparable predefined service and no weakened hard constraints, plus measured improvement in the named effort metric. State exactly which baselines C beats. If C beats A/B but not E/F, report benefit to the LLM workflow and the stronger deterministic baseline. If only costs improve, do not call it output-quality improvement. If no advantage appears, publish the negative result rather than reshaping held-out cases.
+
+One chosen demo trace illustrates a mechanism; it does not establish average improvement. Model-cited memory IDs are not causal proof. The A/B/C treatment comparison supplies the evidence, with remaining sampling/nondeterminism limitations stated.
+
+## Evidence package
+
+Save manifest, implementation commit, synthetic configs, call records without secrets, memory/history snapshots, proposals, reservations, traces, verdicts, Keeper admission/rejection records, per-scenario metrics and aggregate table. Record mock, recorded-live, and live runs distinctly. Mock results validate software mechanics only.

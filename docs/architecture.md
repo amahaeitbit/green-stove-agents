@@ -1,101 +1,65 @@
 # Architecture
 
-## The daily loop
+Scope authority: [PLAN.md](../PLAN.md). Data contracts: [contracts.md](contracts.md). Scoring authority: [simulator-and-evaluation.md](simulator-and-evaluation.md). All components below are planned until implemented.
+
+## Coordination loop
 
 ```mermaid
 flowchart TD
-    G[Standing goal + committee bounds] --> SA[Spec Agent<br/>model]
-    SA --> SV{{Spec validation<br/>code adds / tightens}}
-    SV --> DOD[Definition of done]
-    F[Forecast + downside] --> L[Limits<br/>code: stove cap, reserve]
-    B[(Shared Brain<br/>Keeper-curated)] -->|role briefs| SA
-    B -->|role briefs| PA
-    B -->|role briefs| SMS
-    DOD --> PA[Pricing Agent<br/>model: tariff]
-    L --> PA
-    PA --> PV{{Tariff validation<br/>bounds, grid, change cap}}
-    PV -->|rejected + reasons| PA
-    PV --> PL[Planner<br/>code: bookings]
-    PL --> VE[Verifier<br/>simulator, two scenarios]
-    VE -->|fail + explanations| SU[Supervisor<br/>code]
-    SU -->|feedback / relax in committee order| PA
-    VE -->|pass| SMS[SMS composer<br/>model wording]
-    SMS --> CK{{SMS checker<br/>code}}
-    CK -->|blocked| T[Template] --> CK
-    CK --> OUT[Outbox -> households]
-    OUT --> R[Replies] --> P[Parser<br/>grammar, model fallback]
-    P --> PL
-    VE -->|pass| EX[Execution on controller<br/>hourly telemetry]
-    EX -->|drift| SU
-    SU -->|money / safety only| H[Human ping<br/>genset, clinic shed, priority defer]
-    EX --> LG[(Ledger)]
-    EX -->|evidence| K{{Keeper<br/>code: evidence check,<br/>conflicts, caps, expiry}}
-    VE -->|verdicts| K
-    PA -->|notes| K
-    K --> B
-    B <-->|sync| HQ[(Village / HQ brains)]
+    C[Fixed station and committee configuration] --> X[Current forecast and household requests]
+    M[(Frozen or development Shared Brain)] --> B[Scoped bounded brief]
+    X --> P[Pricing Agent on Crusoe]
+    B --> P
+    P --> T[Validate lattice prices and schema]
+    T --> H[Deterministic household choices and acceptance]
+    H --> A[Deterministic capacity reservation allocator]
+    A --> V[Trace simulator and independent checks]
+    V --> S[Supervisor budgets and stop decisions]
+    S -->|current-run feedback| P
+    S -->|verified plan| E[Actual simulated execution]
+    V --> R[(Evidence records)]
+    E --> R
+    R --> N[Note-writer proposal]
+    B --> N
+    N --> K[Code Keeper reconstructs supported observations]
+    R --> K
+    K -->|development only| M
+    K -->|evaluation| Q[Quarantined audit only]
 ```
 
-## Who decides what
+## Roles and authority
 
-| Component | Runs on | Model? | Decides | Cannot |
-| --- | --- | --- | --- | --- |
-| Spec Agent | HQ (Crusoe) | Nemotron | Draft conditions and rationale | Drop or weaken a hard, human or committee condition |
-| Pricing Agent | HQ (Crusoe) or controller | Nemotron | Tier windows and prices | Leave committee bounds, set safety limits, set lifeline |
-| Limits | Controller | code | Stove cap per step, cooking reserve | — |
-| Planner | Controller | code | Bookings, offers, deferrals | Defer a priority household without a ping |
-| Verifier | Controller | code | Pass or fail per condition | — |
-| Supervisor | Controller | code | Status, relaxations, replans, pings | Report `DONE` without a passing verdict |
-| SMS composer | HQ or controller | Nemotron | Wording in the local language | Send a time or number outside the plan's facts |
-| SMS checker | Controller | code | Send, or fall back to template | — |
-| Reply parser | Controller | grammar, model fallback | Intent of a reply | Produce authority actions (`VERIFY`, `YES`, `NO`) from free text |
-| Ledger | Controller, synced | code | Debits and credits | — |
-| Shared Brain Keeper | Controller + HQ | code | Which notes enter the brain, conflicts, expiry, sync | Admit a note without matching evidence; let agents write facts or decisions |
-| Brief compiler | Controller | code | What each agent reads before a call, under a token budget | Serve superseded or expired entries |
+| Component | Model | Decides | Cannot do |
+| --- | --- | --- | --- |
+| Pricing Agent | Available Crusoe model, preferably Nemotron | Propose three lattice prices using facts, brief and feedback | Change windows, bounds, requirements, private household preferences or evidence |
+| Household agents | Deterministic software | Rank offers and accept within configured authority | Exceed budget/window or reserve unavailable capacity |
+| Allocator | Code | Atomic reservations and reason-coded unserved requests | Bypass household authority or fixed resource checks |
+| Simulator/verifier | Code | Compute physical outcomes and fixed pass/fail | Trust agent totals or label forecasts real-world guarantees |
+| Supervisor | Code | Retry, stop, select verified plan, expose errors | Relax constraints or call three failed attempts infeasible |
+| Note-writer | Model | Propose scoped observations and identify duplicates/conflicts | Directly approve memory or establish unrestricted causal rules |
+| Keeper | Code | Reconstruct facts from evidence, enforce scope/expiry/caps | Treat a matching number as proof of arbitrary prose |
+| Brief compiler | Code | Select supported observations within budget | Serve expired, superseded or configuration-incompatible entries |
 
-## Where it runs and what happens offline
+## Stores
 
-- **Connected:** model calls go to Crusoe Managed Inference; lessons and ledger sync to HQ.
-- **Station controller:** the Supervisor, Verifier, Planner, checker, parser and ledger are
-  plain Python and run on the controller. The same open Nemotron weights can be served
-  locally through an OpenAI-compatible server (`GREENSTOVE_LLM=local`), if the controller
-  hardware allows it (open question in `assumptions.md`).
-- **Offline, no local model:** the Supervisor uses the last verified tariff for the same
-  weather class, or the committee's default tariff, still verified before use. SMS use
-  templates. Intra-day replans need no model at all.
+1. Household configuration: private synthetic preferences and booking authority; source of truth, not learned memory.
+2. Coordination state: candidate requests/offers/reservations. Rejected candidates do not commit changes. Accepted quotes are locked.
+3. Evidence: immutable per-run proposals, traces, verdicts and call records.
+4. Shared Brain: capped structured observations backed by evidence. Include both successes and failures, with phase, configuration and expiry.
+5. Audit: rejected notes and evaluation-time proposals. Never feed held-out results back into a frozen memory comparison.
 
-## Trust boundaries
+Development writes the brain. Evaluation creates fresh agents with frozen snapshots and consistent current-run feedback. Both Pricing and Note-writer read appropriate briefs; their outputs pass independent code checks. The knowledge handoff is visible through snapshot and entry IDs.
 
-1. Every model output is a proposal checked against a pydantic schema and the committee's
-   bounds.
-2. Grading is done by a simulator the model cannot edit or call with its own numbers.
-3. Status, ledger entries and lessons are written only by code.
-4. Authority actions (approvals, planting verification) come only from registered phone
-   numbers through the exact grammar.
-5. Human approval is required only for money and safety, and an unanswered request counts
-   as denied.
+## Optional runtime boundary
 
-## The planning loop in sequence
+If OpenShell integration is completed, place agent tooling under a policy preventing direct writes to approved memory, fixed configuration and evaluator assets. Proposals cross a validated application interface. This complements schema, authorization and Keeper checks; it does not replace them. Verify Crusoe routing and the actual tested policy before claiming the integration.
 
-```mermaid
-sequenceDiagram
-    participant S as Supervisor
-    participant P as Pricing Agent (model)
-    participant PL as Planner
-    participant V as Verifier
-    S->>P: context, limits, bounds, lessons
-    P-->>S: tariff
-    S->>S: validate (bounds, grid, change cap)
-    S->>PL: tariff
-    PL-->>S: bookings
-    S->>V: plan + definition of done
-    V-->>S: verdict + explanations
-    alt passed
-        S->>S: status DONE / DONE_WITH_RELAXATIONS
-    else stalled or loop
-        S->>S: relax next condition in committee order
-        S->>P: failures + explanations
-    else budget spent
-        S->>S: NOT_DONE, safest plan, human pings
-    end
-```
+## Non-LLM comparators
+
+Last-tariff reuse, nearest-context reuse and finite tariff search call the same household, allocator and verifier functions. They receive the same current facts and forecast scenarios. Search uses the same finite action lattice and has budget-3/full results. Only the actual-day evaluator sees actual future weather.
+
+## Status and deployment limits
+
+PLAN_VERIFIED means the modeled forecasts passed. EXECUTION_COMPLETE includes an explicit actual simulated outcome. NO_VERIFIED_PLAN means bounded search failed. INFEASIBLE requires a deterministic bound with recorded assumptions.
+
+The hackathon build does not operate live equipment, make payments, send real SMS, federate villages, or run an unverified model on a station controller. These remain future deployment questions.

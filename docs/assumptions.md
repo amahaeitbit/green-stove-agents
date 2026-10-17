@@ -1,69 +1,42 @@
-# Assumptions to confirm
+# Assumptions and evidence limits
 
-Every value here is a placeholder for the simulator and the demo. Each one moves into
-`config/` and is replaced when pilot data or a source is available.
+The current MVP is defined by [PLAN.md](../PLAN.md). Parameters are synthetic until supported by reviewed sources or pilot records. This document does not certify physical deployment suitability.
 
-## Hardware and loads
+## Decisions to freeze at C0 and C4
 
-| Parameter | Placeholder | Status |
+| Item | MVP decision | Evidence or validation needed |
 | --- | --- | --- |
-| Pilot | 1 station, 1.8 kW, 6 households/day | Given (Green-Stove pilot) |
-| Village station PV | 15 kWp each, 4 stations, 40 households each | 15 kW given; count is a placeholder |
-| Inverter limit | 12 kW per station | To confirm |
-| Battery | 30 kWh LFP per station, initial SoC 0.6 | To confirm |
-| Battery floor (committee) / hardware LVD | 0.20 / 0.10 | To confirm |
-| PV derate | 0.80 | To confirm |
-| Stove | 1.0 kW electric pressure cooker, draw ±8% | To confirm |
-| Session | 30 minutes, 0.5 kWh per meal | To confirm with pilot data |
-| Electric meals | 2 per household per day (lunch, dinner) | To confirm |
-| Clinic tier 1 | Vaccine fridge 0.12 kW, 24 h | To confirm |
-| Clinic tier 2 | Maternity lights 0.25 kW, 18:00–06:00 | To confirm |
-| Clinic tier 3 | Staff charging 0.30 kW, 08:00–17:00 | To confirm |
-| Genset | 5 kW at the clinic station only | To confirm |
-| Controller hardware for local model | Unknown; a 30B-A3B model needs a quantized build and tens of GB of memory | Open question |
+| Station scale | One station; six to ten synthetic households | Choose internally consistent power/energy limits; hand-calculate feasible fixtures |
+| Time | 96 fifteen-minute intervals | Explicit interval units and billing rounding |
+| PV | Seeded forecast, downside and actual profiles | Synthetic unless calibrated with records; actual excluded from planning |
+| Battery | Capacity, initial energy, power limits, efficiencies, reserve in config | Hand-calculated conservation/power-limit checks; equipment evidence if available |
+| Essential load | One fixed protected load | Synthetic specification, no clinical-outcome claim |
+| Households | Different powers, durations, windows, budgets, shift penalties, authority | Synthetic behavior; no claim about actual willingness to shift |
+| Tariffs | Fixed windows, three lattice prices, fixed bounds | One small shared action space for agents and search; no personalized willingness-to-pay pricing |
+| Service floor | Fixed required completed meals/service and inconvenience tolerance | Agree on development requirements before evaluation; no relaxation |
+| Initial state | Reset each evaluation day to manifest state | No hidden carryover or evaluation learning |
+| Memory | Up to 20 scoped observations, initial 600-token brief | Freeze simulated clock/expiry semantics, config hash, caps and selection |
+| Model | Available Crusoe catalog ID, preferably Nemotron | Confirm route, supported parameters, latency and usage cost |
+| Controller inference | Outside MVP | Unknown hardware requirements; open weights alone do not establish fit |
 
-## Committee bounds (demo village, ETB)
+Record actual numeric values in configs and the evaluation manifest, rather than copying large-village placeholders from older plans. Expiry must use one explicit clock so replay does not make memories accidentally stale or immortal.
 
-| Parameter | Placeholder |
-| --- | --- |
-| Price floor / ceiling | 4 / 20 per kWh |
-| Lifeline | 2 per kWh, up to 1 kWh per day, priority households |
-| Max daily price change | ±25% per tier |
-| Default tariff | Sun 10:00–15:00 at 5; standard 8; peak 17:30–20:30 at 12 |
-| Revenue target | 1,000 per village-day |
-| Max household spend | 10 per day |
-| Max meal delay | 60 minutes |
-| Min household service | 0.9 over 7 days |
-| Relaxation order | revenue → max delay → service → wood meals |
-| Planting credit | 5 per tree (half at planting, half at survival check), cap 10 trees and 50 per month |
-| Survival check | 30 days (7 in the 20-day eval) |
+## Background claims needing independent evidence
 
-## Households and behavior
+The original Word document and earlier README mention roughly 140 million people without electricity, percentages of biomass dependence, stove efficiencies, and a 1.8 kW pilot serving six households. Do not use those as established findings without source/year/geography or pilot records. No such claims are validated by this planning update.
 
-| Parameter | Placeholder |
-| --- | --- |
-| Priority share | 10% |
-| Languages | Tigrinya 55%, Amharic 25%, Afaan Oromo 15%, English 5% |
-| Preferred lunch / dinner | Normal around 12:30 (σ 40 min) / 18:45 (σ 35 min) |
-| Window | Lunch −150/+60 min; dinner −240/+90 min |
-| Delay cost | 0.8–3.0 per hour |
-| Patience | 30–90 minutes |
-| Compliance | 0.85 (0.75 in the downside scenario) |
-| Wood per meal | 1.2 kg |
-| Collection hours per wood meal | 0.6 |
-| Forecast downside factor | 0.75 |
+A public equipment source supports an input assumption; it does not validate household behavior or calibrate the entire simulator. Search output and webpages are untrusted inputs until reviewed. Existing hardware/pilot work must be separated from new hackathon code.
 
-## Claims in the pitch that need a source before submission
+## Interpretation limits
 
-| Claim | Note |
-| --- | --- |
-| ~140 million people without electricity in the Horn of Africa | Cite the source and year |
-| ~90% of household energy from wood and charcoal; 97% in Southern Ethiopia | Cite the source |
-| Traditional stoves convert 30–40% of fuel into usable heat | Check: three-stone fires are often reported well below this; the range may describe improved stoves |
-| Green-Stove's 1.8 kW pilot cooks for six households a day | Pilot record |
+- A simulated meal completed is not measured firewood displacement, collection time avoided, carbon reduction, or vaccine preservation.
+- A forecast-verified plan may fail actual simulated execution; report both.
+- Three unsuccessful candidates do not prove infeasibility.
+- Matching evidence values validates a structured observation, not an arbitrary causal rule.
+- A small single-run test is descriptive. Low temperature and caching do not establish independent repeated evidence.
+- Memory construction and research costs must not disappear from net-efficiency claims.
+- If nearest reuse or deterministic search dominates, state that result without claiming the LLM is necessary.
 
-## Open questions
+## Deferred deployment questions
 
-- Ethiopian or international clock in SMS times.
-- Native-speaker review of SMS templates and banned-promise lists for each language.
-- Which SMS gateway would be used after the hackathon (out of scope now).
+Real equipment calibration, real user consent, communications delivery, payment, multilingual messaging, offline control, plant verification, federation and real-world operational approval are outside this MVP. They are not demo claims.

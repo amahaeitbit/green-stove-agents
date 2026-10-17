@@ -4,6 +4,8 @@ Date: October 17, 2026
 
 Status: design proposals synthesized from Abel's ChatGPT discussion and the Claude refinement shared in that discussion. These are hypotheses and implementation recommendations, not measured results or completed integrations. This note supplements the existing plan; it does not silently replace it. The team should reconcile accepted decisions into PLAN.md before implementation.
 
+> Current implementation authority: [PLAN.md](../PLAN.md), [contracts.md](contracts.md), and [evaluation protocol](simulator-and-evaluation.md). This note preserves earlier reasoning. Where it differs, the current plan wins: fixed windows and a finite price lattice, no generalized-rule promotion, six comparator conditions including nearest reuse and deterministic search, no required performance win, and frozen evaluation memory.
+
 ## The claim we want to test
 
 > Household agents coordinate affordable cooking times with a village grid agent. A shared memory of simulation-backed observations helps fresh agents reach acceptable plans with fewer attempts, without weakening community constraints.
