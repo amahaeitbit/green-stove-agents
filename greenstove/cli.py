@@ -428,7 +428,8 @@ def cmd_e2e(a) -> int:
     mode = ["--mode", a.mode] if a.mode else []
     day = a.date or time.strftime("%Y-%m-%d", time.localtime(time.time() + 86400))
     fc = root / "forecast" / f"asmara-eritrea-{day}-{'live' if live else 'mock'}.json"
-    has_runner = "runner" in _subcommands()
+    subs = _subcommands()
+    has_runner, has_compare, has_report = "runner" in subs, "compare" in subs, "report" in subs
     steps = [  # (name, argv, required, what it shows)
         ("preflight", ["preflight"] + mode, False, "readiness: keys, spend flag, model id, world, tests"),
         ("smoke", ["smoke"] + mode, True, "one structured Crusoe call recorded"),
@@ -442,6 +443,8 @@ def cmd_e2e(a) -> int:
         ("freeze", ["freeze", "--out", str(root / "freeze")], True, "brain snapshot + raw history hashed"),
         ("eval-agents", ["eval-agents", "--freeze", str(root / "freeze"), "--out", str(root / "eval"),
                          "--days", str(a.days)] + mode, True, "Shared Brain: A/B/C on held-out days"),
+        ("compare", ["compare", "--freeze", str(root / "freeze"), "--out", str(root / "compare"), "--days", str(a.days)]
+         + mode, False, "six conditions: A/B/C + last-tariff reuse, nearest reuse, search") if has_compare else None,
         ("evolve", ["evolve", "--rounds", "2"] + mode, False, "Version N+1: playbook kept only if it helps"),
         ("before-after", ["playbook", "before-after"] + mode, False, "Version N+1: held-out before/after"),
         ("runner-event", ["event", "day_start", "--date", day, "--scenario", "demo-handoff-overcast"], False,
@@ -451,6 +454,8 @@ def cmd_e2e(a) -> int:
         ("tracks", ["tracks", "--out", str(root / "tracks")], False,
          "scorecard: every requirement of Done Means Done, Shared Brain, Version N+1"),
         ("usage", ["usage"], False, "calls, tokens, cache hits, latency, cost"),
+        ("report", ["report", "--e2e", str(root), "--out", str(root / "results.md")], False,
+         "results report for judges") if has_report else None,
     ]
     results, warned, failed = [], [], []
     for step in filter(None, steps):
@@ -489,11 +494,11 @@ def cmd_e2e(a) -> int:
 def _subcommands() -> set[str]:
     p = argparse.ArgumentParser()
     sub = p.add_subparsers(dest="cmd")
-    try:
-        from greenstove import runner
-        runner.register(sub)
-    except ImportError:
-        return set()
+    for optional in ("runner", "comparators", "results"):
+        try:
+            __import__(f"greenstove.{optional}", fromlist=["register"]).register(sub)
+        except ImportError:
+            pass
     return set(sub.choices)
 
 def cmd_demo(a) -> int:
@@ -569,11 +574,11 @@ def main(argv: list[str] | None = None) -> int:
     from greenstove import evolve, tracks
     evolve.register(sub)                          # playbook show|history|before-after, evolve (Version N+1)
     tracks.register(sub)                          # tracks: requirement-by-requirement scorecard for the 3 tracks
-    try:
-        from greenstove import runner
-        runner.register(sub)                      # runner --once|--watch|status, event ... (always-on)
-    except ImportError:
-        pass
+    for optional in ("runner", "comparators", "results"):   # always-on runner, six-condition compare, report
+        try:
+            __import__(f"greenstove.{optional}", fromlist=["register"]).register(sub)
+        except ImportError:
+            pass
     a = p.parse_args(argv)
     try:
         return a.fn(a)
