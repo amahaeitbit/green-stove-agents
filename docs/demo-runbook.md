@@ -16,7 +16,9 @@ one-minute video. Segment owners follow [submission.md](submission.md). Commands
 | Setup and readiness | Install, tests, mock smoke; PASS/WARN/FAIL table for key, spend flag, model id, world, brain, tests, git | `scripts/setup.sh`, `preflight` |
 | Weather + solar forecast (You.com + Nemotron) | Cited forecast for the site and date, verified quote, PV and downside profiles in kWh | `gsa forecast --mode live`, then `gsa decide --forecast <file>` |
 | Operator decision record | Today's tariff and why, memory relied on, both checks, bookings, who must confirm, rejected alternatives, cost | `gsa decide --scenario demo-handoff-overcast --condition C` |
-| End-to-end runner | smoke → warm-up → freeze → held-out A/B/C → recorded demo in one folder | `e2e` |
+| Version N+1 | Reviewer agent's playbook change kept only if it scores better; held-out before/after | `gsa evolve --rounds 2`, `gsa playbook before-after` |
+| Always-on runner (NemoClaw-ready) | Events wake the agents; telemetry below plan raises a human alert with zero model calls | `gsa event day_start …`, `gsa runner --once`, `gsa runner status`; sandbox kit in `deploy/nemoclaw/` |
+| End-to-end runner | every step (preflight, Crusoe, forecast, decide, warm-up, freeze, A/B/C, Version N+1, runner, demo, usage) in one folder with `e2e-summary.md` | `e2e` |
 | Recorded transcripts | Every demo run is saved and can be replayed, labeled RECORDED | `demo --replay data/demo/<file>.txt` |
 | Results table *(Abel)* | Held-out comparison of all six conditions | `docs/results.md` from `eval` |
 

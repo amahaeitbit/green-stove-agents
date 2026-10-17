@@ -25,7 +25,8 @@ scripts/setup.sh                                         # install, tests, mock 
 .venv/bin/python -m greenstove demo --pause              # the demo scenes (mock unless live is on)
 .venv/bin/python scripts/set_crusoe_key.py --enable-live # key via native dialog, live mode on
 .venv/bin/python -m greenstove preflight --mode crusoe   # PASS/WARN/FAIL before going live
-.venv/bin/python -m greenstove e2e --mode crusoe         # smoke, warm-up, freeze, held-out A/B/C, demo
+.venv/bin/python -m greenstove e2e --mode crusoe         # every step: preflight, Crusoe models/bench, forecast,
+                                                         # decide, warm-up, freeze, A/B/C, Version N+1, runner, demo, usage
 ```
 
 Until Abel's world is merged, commands run on a labeled development stand-in
@@ -49,11 +50,11 @@ Start with [PLAN.md](PLAN.md). It contains the ordered tasks, six-hour reference
 | --- | --- | --- | --- |
 | **Shared Brain** (primary track) | Every agent reads a 600-token brief from one shared memory before it works; after it works, a code Keeper admits only notes that match recorded evidence, rejects fabricated numbers and rule changes, keeps conflicts scoped, expires stale entries; frozen for evaluation; fresh agents compared with no memory and raw history on held-out days | `gsa warmup`, `gsa brain show\|audit`, `gsa freeze`, `gsa eval-agents` | Built, tested in mock; live measurement pending |
 | **Done Means Done** | Fixed machine-checkable requirements, independent simulator + verifier on expected and downside forecasts, max 3 attempts, repeat detection, deterministic infeasibility proof before spending calls, honest statuses (PLAN_VERIFIED, NO_VERIFIED_PLAN, INFEASIBLE, ERROR), operator decision record, human needed only for pending household offers | `gsa run`, `gsa decide` | Built, tested |
-| **Version N+1** | Reviewer agent rewrites the Pricing Agent's playbook from development runs; a change is kept only if it scores better on development days; before/after on unseen days | `gsa evolve`, `gsa playbook before-after` | In progress (separate, labeled experiment) |
+| **Version N+1** | Reviewer agent rewrites the Pricing Agent's playbook from development runs; a change is kept only if it scores better on development days; before/after on unseen days | `gsa evolve`, `gsa playbook before-after` ([version-n-plus-1.md](docs/version-n-plus-1.md)) | Built, mock-tested (separate, labeled experiment); live run pending |
 | **Crusoe Managed Inference** | All model calls; live catalog for exact Nemotron ids, supported parameters and pricing; per-role routing; structured output; thinking control; prompt-cache and cost accounting; rate-limit handling | `gsa models`, `gsa bench`, `gsa usage` ([crusoe.md](docs/crusoe.md)) | Built; tested against a simulated endpoint; live run pending key |
 | **NVIDIA Nemotron** | Pricing Agent, Note-writer, forecast extractor (and Version N+1 reviewer) | banner of every command | Pending first live call |
 | **You.com** | Cited weather forecast for the site and date; values kept only if the quote is in the retrieved page; converted to a solar profile | `gsa forecast`, `gsa decide --forecast` | Built, mock-tested; live pending key |
-| **NVIDIA NemoClaw / OpenShell** | Always-on, event-driven runner packaged for a NemoClaw sandbox on a teammate's WSL2/NVIDIA laptop: only Crusoe/You.com egress, frozen memory and config read-only | `gsa runner --watch`, `deploy/nemoclaw/` | In progress; cannot run on the Mac used here |
+| **NVIDIA NemoClaw / OpenShell** | Always-on, event-driven runner packaged for a NemoClaw sandbox on a teammate's WSL2/NVIDIA laptop: only Crusoe/You.com egress, frozen memory and config read-only | `gsa event …`, `gsa runner --once\|--watch\|status`, `deploy/nemoclaw/` ([always-on.md](docs/always-on.md)) | Runner built and tested; NemoClaw kit written from the docs, not yet run in a real sandbox (teammate's WSL2 laptop) |
 
 ## Existing work and scope
 

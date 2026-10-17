@@ -26,7 +26,11 @@ One command runs the partner side of it in an isolated folder (`data/e2e-<time>/
 .venv/bin/python -m greenstove e2e --mode crusoe   # live Nemotron on Crusoe
 ```
 
-It runs smoke → warmup → freeze → eval-agents → demo and stops at the first failing step.
+It runs preflight → smoke → models (live) → bench → forecast → decide on the forecast → warmup →
+freeze → eval-agents (A/B/C) → evolve → playbook before-after (Version N+1) → runner event →
+runner → demo → usage, and writes `e2e-summary.md`. Required steps (smoke, warmup, freeze,
+eval-agents, demo) stop the run when they fail; optional ones warn and continue (for example a
+forecast without a You.com key).
 
 ## Setup (once per machine, about 3 minutes)
 
