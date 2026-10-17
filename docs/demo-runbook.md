@@ -1,0 +1,88 @@
+# Demo runbook
+
+The commands, order, timing and fallbacks for the three-minute live demo and the
+one-minute video. Segment owners follow [submission.md](submission.md). Commands marked
+*(Abel)* depend on Abel's evaluation code; everything else is in the agent layer.
+
+## Tools used on stage
+
+| Tool | What it shows | Command |
+| --- | --- | --- |
+| Crusoe Managed Inference (live model) | Real Pricing Agent and Note-writer calls, with request ids, tokens and latency | `smoke --mode crusoe`, `demo --mode crusoe` |
+| Nemotron (exact id from `/v1/models`) | The model behind both agent roles | printed in the banner of every command |
+| Terminal demo (`rich`) | World, attempts and verdicts, reservations, demand and battery strips, Keeper decisions, brief, fresh-agent comparison, infeasibility proof | `python -m greenstove demo` |
+| Shared Brain tools | Entries, versions, expiry, conflict groups; audit log of admissions and rejections | `brain show`, `brain audit` |
+| Recorded transcripts | Every demo run is saved and can be replayed, labeled RECORDED | `demo --replay data/demo/<file>.txt` |
+| Results table *(Abel)* | Held-out comparison of all six conditions | `docs/results.md` from `eval` |
+
+All commands run as `.venv/bin/python -m greenstove <command>` from the repo root.
+
+## T−30 minutes: preflight
+
+1. `git pull` on the branch you will demo; `uv pip install --python .venv/bin/python -e ".[dev]"`.
+2. `.venv/bin/python -m pytest -q`: all green.
+3. Key and spend flag: `.venv/bin/python scripts/set_crusoe_key.py`, then set
+   `GREENSTOVE_LLM=crusoe` and `GREENSTOVE_LIVE_SPEND_OK=1` in `.env`.
+4. `python -m greenstove smoke --mode crusoe`: the Nemotron id is in the catalog, one
+   valid proposal comes back, and the call is recorded under `data/smoke/`.
+5. Build the development brain (it is used by the handoff scene):
+   `python -m greenstove warmup --mode crusoe`, then `python -m greenstove brain show`.
+6. Record a full fallback run: `python -m greenstove demo --mode crusoe`. Note the
+   transcript path it prints (`data/demo/demo-crusoe-<time>.txt`).
+7. Check the banner says which world is running. If it says `stub-env (development
+   stand-in, not Abel's simulator)`, Abel's world is not merged yet: say so on stage.
+8. Close other apps, set the terminal font large, widen the window to at least 120 columns,
+   and keep a phone hotspot ready.
+
+## Live sequence (3:00)
+
+Run everything from one process so the proposal and memory scenes share a run:
+`python -m greenstove demo --mode crusoe --pause` (Enter moves to the next scene). Show
+Abel's results table between the handoff and infeasible scenes.
+
+| Time | Scene | Speaker | Say |
+| --- | --- | --- | --- |
+| 0:00–0:25 | `world` | Abel | Households differ in power, duration, window, budget and whether they auto-book; the station has fixed limits |
+| 0:25–0:55 | `proposal` | Partner | A fresh Pricing Agent on Crusoe proposes prices; code allocates and verifies on expected and downside forecasts; one attempt fails with named codes, the next passes; reservations are capacity-backed |
+| 0:55–1:25 | `memory` | Partner | The Note-writer proposes observations; the Keeper rebuilds facts from evidence ids and admits them; a fabricated note is rejected for an unsupported number |
+| 1:25–1:55 | `handoff` | Partner | A new agent on a different scenario reads the brief (entry ids shown), cites entries and is verified; brain off on the same scenario for contrast; one example, not the evidence |
+| 1:55–2:30 | results *(Abel)* | Abel | All six conditions on held-out days, including nearest reuse and search, with service and effort |
+| 2:30–2:45 | `infeasible` | Abel | A deterministic energy bound proves the day cannot fit, so the system stops honestly without spending model calls |
+| 2:45–3:00 | — | Both | Crusoe and Nemotron actually used; what was built today; simulator limits |
+
+Single scenes also work: `demo --scene world|proposal|memory|handoff|infeasible`
+(`memory` runs its own agent day when used alone).
+
+## Fallbacks
+
+| Problem | Do this | Label on screen |
+| --- | --- | --- |
+| Crusoe error, 429 or 503 mid-demo | The client already backs off; if it still fails, rerun the scene with `--mode mock` | Banner shows MOCK (rule-based stand-in) |
+| No network | `demo --replay data/demo/demo-crusoe-<time>.txt` from preflight step 6 | RECORDED |
+| Abel's world not merged | Run as is | Banner shows stub-env; say it out loud |
+| Brain empty in the handoff scene | `warmup` first (preflight step 5) | — |
+
+Never present mock output as model quality, and never present a replay as live.
+
+## One-minute video
+
+Record the screen (QuickTime → New Screen Recording) while running
+`demo --mode crusoe --pause`, then cut to these shots:
+
+| Seconds | Shot |
+| --- | --- |
+| 0–10 | Problem and today's scope: agent layer and Shared Brain built today; Green-Stove hardware is earlier work |
+| 10–25 | `proposal`: proposal, failed check, passing attempt, reservations |
+| 25–40 | `memory` and `handoff`: note admitted, fabricated note rejected, fresh agent reading the brief |
+| 40–55 | Results table *(Abel)* |
+| 55–60 | Tools actually used and limits |
+
+Upload unlisted (YouTube, Loom or Google Drive), check the link in a private window, and
+put it in the submission form with the public repo link.
+
+## Evidence to keep
+
+Runs, evidence and the brain live in `data/` (git-ignored). Before submitting, copy the
+smoke record, the live demo transcript and the frozen brain snapshot
+(`brain freeze --out docs/evidence/brain-frozen`) into `docs/evidence/` and check them
+for secrets: they contain no keys by design, but look anyway.
