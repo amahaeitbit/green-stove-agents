@@ -184,11 +184,11 @@ honor coverage.complete before advertising verified grid service.
 
 ## Battery-backed start admission
 
-Environment-side independent verification is now available in `admission_verifier.py`,
-with the supervisor-compatible bridge in `admission_world.py`. See
-[the integration handoff](environment-integration-ready.md) for the partner-owned loader
-and memory fingerprint hooks. This does not automatically replace the legacy adapter's
-verifier. Actual verification takes evaluator-supplied ActualScenario separately; a
+Environment-side independent verification is implemented in `admission_verifier.py`,
+with the supervisor-compatible bridge in `admission_world.py`. The `abel-admission`
+loader selects this bridge; see [the integration handoff](environment-integration-ready.md).
+Normal days and the acceptance rehearsal share one ledger execution loop. Actual
+verification takes evaluator-supplied ActualScenario separately; a
 trace's own PV array is not authoritative. Configuration identity includes BatterySpec,
 policy/simulator/verifier versions and effective requirements. Regenerate old development
 memory after adopting this identity. No C0 schema or version changes are implied.

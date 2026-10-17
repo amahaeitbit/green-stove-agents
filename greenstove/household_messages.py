@@ -111,6 +111,34 @@ def message_for(messages: list[HouseholdMessage], household_id: str) -> list[Hou
     return [m for m in messages if m.household_id == household_id]
 
 
+def execution_events(context: ScenarioContext, plan: Plan, trace: Trace) -> list[dict]:
+    """Rebuild notices from VERIFIED actual decisions/outcomes, not arbitrary trace metadata.
+
+    Call only after verification. These records replay the simulated execution; they
+    are not device commands. Each record contains only its recipient's information.
+    """
+    if trace.phase != "actual":
+        raise ContractError("household execution notices require actual phase")
+    requests = {q.request_id: q for q in context.requests}
+    reservations = {r.reservation_id: r for r in plan.reservations}
+    events = []
+    for d in trace.extra.get("admission", []):
+        r = reservations[d["reservation_id"]]
+        q = requests[r.request_id]
+        status, reason = _status(r, [d], "unserved" if d["status"] == "UNSERVED" else None)
+        message = HouseholdMessage(household_id=q.household_id, request_id=q.request_id,
+                                    reservation_id=r.reservation_id, status=status, reason=reason,
+                                    start=step_label(r.start_step), end=step_label(r.end_step), locked_quote=r.locked_cost)
+        events.append({"step": d["step"], "kind": "finalise" if d.get("final") else "admission",
+                       "request_id": q.request_id, "messages": [message.model_dump()]})
+    for message in household_outcomes(context, plan, trace):
+        if message.status == "COMPLETED":
+            r = reservations[message.reservation_id]
+            events.append({"step": r.end_step, "kind": "completed", "request_id": r.request_id,
+                           "messages": [message.model_dump()]})
+    return sorted(events, key=lambda e: (e["step"], e["kind"] != "completed", e["request_id"]))
+
+
 def render_one(m: HouseholdMessage) -> str:
     """One SMS-length line (<= 160 characters) for one household."""
     parts = [f"{m.household_id}: {_HEADLINE[m.status]}"]

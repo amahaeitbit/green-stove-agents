@@ -150,14 +150,13 @@ def _battery_spec_dict(ctx) -> dict:
 
 def admission_variant(ctx):
     """Same scenario under Abel's admission policy: own station hash so memory never mixes worlds."""
-    from greenstove.env_protocol import short_hash, with_scenario_hash
+    from greenstove.env_protocol import with_scenario_hash
     from greenstove.admission_verifier import configuration_hash
-    from greenstove.scenarios import DEFAULT_REQUIREMENTS
     from greenstove.world_adapter import battery_spec
-    fingerprint = configuration_hash(ctx, battery_spec(ctx), DEFAULT_REQUIREMENTS)   # Abel's recipe, base context
+    from greenstove.scenarios import DEFAULT_REQUIREMENTS
     return with_scenario_hash(ctx.model_copy(update={
         "scenario_id": f"{ctx.scenario_id}-adm",
-        "config_hash": fingerprint,
+        "config_hash": configuration_hash(ctx, battery_spec(ctx), DEFAULT_REQUIREMENTS),
         "assumptions": list(ctx.assumptions) + ["evaluated under Abel's battery-backed admission policy"]}))
 
 
@@ -422,8 +421,11 @@ def cmd_eval_agents(a) -> int:
               "world": env.name, "commit": agent_eval.git_commit(), "brain_snapshot": info["brain_snapshot"],
               "days": len(names)}
     console.print(agent_eval.summarize(runs, out, header), markup=False)
-    frag = agent_eval.manifest_fragment(info, names, scenarios.DEFAULT_REQUIREMENTS, llm, env, scenarios.config_hash(),
+    actual_config_hash = context_for(names[0]).config_hash if names else scenarios.config_hash()
+    frag = agent_eval.manifest_fragment(info, names, scenarios.DEFAULT_REQUIREMENTS, llm, env, actual_config_hash,
                                         dod=dod)
+    if names and hasattr(env, "configuration_record"):
+        frag["partner"]["environment_configuration"] = env.configuration_record(scenarios.scenario(names[0]))
     (out / "manifest-partner.json").write_text(json.dumps(frag, indent=2))
     console.print(f"records: {out.relative_to(ROOT) if out.is_relative_to(ROOT) else out}")
     return 0
@@ -498,7 +500,7 @@ def cmd_e2e(a) -> int:
         console.rule("[bold]e2e · report")
         code = main(["report", "--e2e", str(root), "--out", str(root / "results.md")])
         results.append(("report", "ok" if code == 0 else f"skipped/warn (exit {code})", "results report for judges"))
-        lines.append(f"| report | {results[-1][1]} | results report for judges |")
+        lines.insert(len(lines) - 2, f"| report | {results[-1][1]} | results report for judges |")
         (root / "e2e-summary.md").write_text("\n".join(lines) + "\n")
     if "replay" in subs:                          # HTML replay of the recorded demo + this run's results
         console.rule("[bold]e2e · replay")

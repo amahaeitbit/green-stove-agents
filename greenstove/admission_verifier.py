@@ -14,8 +14,9 @@ from .tariff import validate_tariff
 from .verifier import _check_unserved
 
 POLICY_VERSION = "stored-energy-to-day-end-1"
-ADMISSION_VERIFIER_VERSION = "independent-admission-1"
-SUPPORTED_SIMULATOR_VERSION = "admission-glue-1"
+ADMISSION_VERIFIER_VERSION = "independent-admission-2"
+SUPPORTED_SIMULATOR_VERSION = "admission-execution-2"
+LEGACY_SIMULATOR_VERSION = "admission-glue-1"
 DT = Decimal("0.25")
 TOL = 1e-6                         # serialized trace arrays are rounded to six decimals
 ENERGY_TOL = Decimal("1e-12")
@@ -52,15 +53,22 @@ def _same_number(reported, expected, label):
 
 
 def verify(trace: Trace, requirements: Requirements, context: ScenarioContext, plan: Plan,
-           battery: BatterySpec, *, actual: ActualScenario | None = None) -> Verdict:
-    """Verify a full 0..96 simulation. Inconsistent/stale traces raise ContractError.
+           battery: BatterySpec, *, actual: ActualScenario | None = None, start_step: int = 0) -> Verdict:
+    """Verify the declared start_step..96 simulation. Inconsistent traces raise ContractError.
 
     A different requirements snapshot is rejected, never silently re-simulated. For
     actual phase the evaluator must pass ActualScenario separately from the trace.
     """
     identity = configuration(context, battery, requirements)
-    if trace.simulator_version != SUPPORTED_SIMULATOR_VERSION:
+    if isinstance(start_step, bool) or not isinstance(start_step, int) or not 0 <= start_step < 96:
+        raise ContractError("start_step must be an integer from 0 to 95")
+    if trace.simulator_version not in (SUPPORTED_SIMULATOR_VERSION, LEGACY_SIMULATOR_VERSION):
         raise ContractError("unsupported admission simulator version")
+    current = trace.simulator_version == SUPPORTED_SIMULATOR_VERSION
+    if not current and start_step != 0:
+        raise ContractError("legacy admission trace must start at step zero")
+    if current and trace.extra.get("start_step") != start_step:
+        raise ContractError("trace start step differs from authoritative run start")
     if (trace.scenario_id, trace.config_hash, trace.scenario_hash, trace.proposal_id) != (
             context.scenario_id, context.config_hash, context.scenario_hash, plan.proposal_id):
         raise ContractError("admission trace belongs to another plan/context")
@@ -102,10 +110,13 @@ def verify(trace: Trace, requirements: Requirements, context: ScenarioContext, p
     held = cooking_profile(plan, include_pending=True)
     if any(h + e > context.inverter_kw + 1e-9 for h, e in zip(held, context.essential_load_kw)):
         raise ContractError("reservation capacity holds overbook inverter")
-    expected_sim_id = short_hash({"plan": plan.model_dump(mode="json"), "scenario": context.scenario_hash,
+    sim_identity = {"plan": plan.model_dump(mode="json"), "scenario": context.scenario_hash,
                                  "config": context.config_hash, "phase": trace.phase, "pv": list(pv),
                                  "battery": battery.model_dump(), "req": requirements.model_dump(),
-                                 "v": SUPPORTED_SIMULATOR_VERSION}, 16)
+                                 "v": trace.simulator_version}
+    if current:
+        sim_identity["start_step"] = start_step
+    expected_sim_id = short_hash(sim_identity, 16)
     if trace.simulation_id != expected_sim_id:
         raise ContractError("admission simulation identity mismatch")
     # Version 1 glue used a different tariff hash; accept only these two explicit recipes.
@@ -118,8 +129,15 @@ def verify(trace: Trace, requirements: Requirements, context: ScenarioContext, p
     stored, floor = D(context.initial_battery_kwh), D(battery.floor_kwh)
     eta = D(battery.discharge_efficiency)
     active, admitted, decisions, outcomes = [], [], [], {}
+    deferred = {}
     total_shortage = Decimal(0)
-    for t in range(96):
+    if any(r.start_step < start_step for r in plan.reservations):
+        raise ContractError("reservation precedes authoritative run start")
+    for t in range(start_step):
+        _same_number(trace.cooking_kw[t], 0, f"pre-run cooking[{t}]")
+        _same_number(trace.demand_kw[t], context.essential_load_kw[t], f"pre-run demand[{t}]")
+        _same_number(trace.battery_kwh[t], stored, f"pre-run battery[{t}]")
+    for t in range(start_step, 96):
         for r in sorted((r for r in plan.reservations if r.start_step == t), key=lambda r: r.request_id):
             q = req[r.request_id]
             available = max(Decimal(0), stored - floor)
@@ -157,6 +175,17 @@ def verify(trace: Trace, requirements: Requirements, context: ScenarioContext, p
                 admitted.append(r)
             else:
                 outcomes[r.reservation_id] = "deferred" if status == "DEFER" else "unserved"
+                if current and status == "DEFER" and reason != "APPROVAL_REQUIRED":
+                    deferred[r.reservation_id] = (r, decisions[-1])
+        for rid, (r, first) in list(deferred.items()):
+            if t >= req[r.request_id].latest_finish - req[r.request_id].duration_steps:
+                decisions.append({"reservation_id": rid, "request_id": r.request_id, "step": t,
+                                  "status": "UNSERVED", "reason": first["reason"],
+                                  "ledger_reason": "NEW_RESERVATION_REQUIRED", "final": True,
+                                  "required_kwh": first["required_kwh"],
+                                  "available_kwh": float(max(Decimal(0), stored-floor))})
+                outcomes[rid] = "unserved"
+                del deferred[rid]
         cooking = sum((D(r.power_kw) for r in active), Decimal(0))
         essential, solar = D(context.essential_load_kw[t]), D(pv[t])
         discharge_kw = min(D(battery.max_discharge_kw), max(Decimal(0), stored - floor) * eta / DT)

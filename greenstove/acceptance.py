@@ -80,6 +80,10 @@ def execute(plan: Plan, context: ScenarioContext, battery: BatterySpec, *, start
     every can_start sees the state returned by the previous transition (no stale snapshot)."""
     requirements = requirements or Requirements()
     pv = list(pv_kw) if pv_kw is not None else [0.0] * STEPS
+    if len(pv) != STEPS or any(not math.isfinite(p) or p < 0 for p in pv):
+        raise ContractError("execution requires 96 finite non-negative PV samples")
+    if any(r.start_step < start_step for r in plan.reservations):
+        raise ContractError("reservation precedes authoritative run start")
     req = {r.request_id: r for r in context.requests}
     booked = [r.request_id for r in plan.reservations]
     if len(booked) != len(set(booked)):                 # one admission per request, ever
@@ -192,7 +196,8 @@ def private(m: HouseholdMessage, context: ScenarioContext, plan: Plan, line: str
 
 def run_acceptance() -> dict:
     from greenstove.supervisor import complete_pass
-    from greenstove.world_adapter import AdmissionWorld
+    from greenstove import admission_verifier
+    from greenstove.models import ActualScenario, tariff_version
 
     context, battery, fx = acceptance_scenario()
     requirements = Requirements()
@@ -210,7 +215,18 @@ def run_acceptance() -> dict:
     a_msgs = [(e.step, m.status) for e in run.events for m in e.messages if m.household_id == "hh-A"]
     b_final = [d for d in decided("req-B") if d.get("final")]
     b_last = context.requests[1].latest_finish - context.requests[1].duration_steps
-    verdict = AdmissionWorld(requirements).verify(run.trace, requirements, context, plan)
+    # Verify the same loop independently, including its explicitly declared late start.
+    trace = run.trace
+    trace.simulator_version = admission_verifier.SUPPORTED_SIMULATOR_VERSION
+    trace.tariff_version = tariff_version(plan.tariff)
+    trace.extra["start_step"] = fx["start_step"]
+    trace.simulation_id = short_hash({"plan": plan.model_dump(mode="json"), "scenario": context.scenario_hash,
+                                     "config": context.config_hash, "phase": "actual", "pv": trace.pv_kw,
+                                     "battery": battery.model_dump(), "req": requirements.model_dump(),
+                                     "v": trace.simulator_version, "start_step": fx["start_step"]}, 16)
+    verdict = admission_verifier.verify(trace, requirements, context, plan, battery,
+                                         actual=ActualScenario(actual_pv_kw=[0.0]*STEPS),
+                                         start_step=fx["start_step"])
     status = "PLAN_VERIFIED" if complete_pass(verdict) else "NO_VERIFIED_PLAN"
     forged = verdict.model_copy(update={"passed": True,
                                         "coverage": verdict.coverage.model_copy(update={"complete": False})})

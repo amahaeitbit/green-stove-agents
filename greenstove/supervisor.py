@@ -62,6 +62,8 @@ def _feedback_entry(n: int, prices: dict | None, verdicts: list[Verdict], errors
         codes = []
         for f in v.feedback_codes[:6]:
             item = {"code": f.code}
+            if f.message:
+                item["message"] = f.message
             if f.interval is not None:
                 item["at"] = hhmm(f.interval)
             if f.request_id:
@@ -169,9 +171,12 @@ def run_agent_day(context: ScenarioContext, memory_mode: MemoryMode, requirement
                     trace = env.simulate(plan, context, ph)
                     v = env.verify(trace, dod_req, context, plan)
                 except ContractError as exc:             # world does not model this phase (e.g. Abel's C0)
+                    if not str(exc).startswith(("UNSUPPORTED_PHASE:", "UNSUPPORTED_PROFILE:")):
+                        raise                         # stale/tampered evidence is a bug, not a coverage gap
                     unmodeled.append(ph)
                     evidence.write(run_id, f"unmodeled_{n}_{ph}", {"phase": ph, "error": str(exc)[:200]})
                     continue
+                evidence.write(run_id, f"trace_{n}_{ph}", trace)
                 evidence.write(run_id, f"verdict_{n}_{ph}", v)
                 rec.simulator_runs += 1
                 ev = _evidence(v, run_id, context, sit, proposal.prices, pid, _outcomes(plan, trace))
@@ -246,9 +251,18 @@ def run_agent_day(context: ScenarioContext, memory_mode: MemoryMode, requirement
             atrace = env.simulate(selected_plan, context, "actual", actual)
             v = env.verify(atrace, dod_req, context, selected_plan)
         except ContractError as exc:
+            if not str(exc).startswith(("UNSUPPORTED_PHASE:", "UNSUPPORTED_PROFILE:")):
+                raise
             rec.reason += f"; actual execution not modeled by this world ({str(exc)[:60]})"
         else:
+            evidence.write(run_id, "trace_actual", atrace)
             evidence.write(run_id, "verdict_actual", v)
+            if "admission" in atrace.extra:
+                from greenstove.household_messages import household_outcomes, execution_events
+                # These are simulated actual-execution notices. Forecast decisions
+                # must never be placed in the household outbox.
+                evidence.write(run_id, "household_outcomes", household_outcomes(context, selected_plan, atrace))
+                evidence.write(run_id, "household_events", execution_events(context, selected_plan, atrace))
             rec.simulator_runs += 1
             ev = _evidence(v, run_id, context, sit, rec.selected_tariff or {}, rec.selected_proposal_id or "",
                            _outcomes(selected_plan, atrace))

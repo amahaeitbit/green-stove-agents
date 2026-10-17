@@ -1,3 +1,7 @@
+**Historical review.** The findings below describe `8ee143f`, not the reconciled implementation.
+See [the current integration handoff](environment-integration-ready.md) for implemented
+fixes, test evidence and the remaining joint steps. Preserve this document as review history.
+
 **For Isaac (and Isaac's coding agent).** This is an independent integration review of the joint checkpoint, posted by Abel. Please work the tasks marked **Isaac**. Tasks marked **Abel** are his files (`greenstove/admission.py`, `allocator.py`, `verifier.py`, `models.py`, fixtures); coordinate before changing them. Do not merge to `main` until the acceptance run below passes and both sign `docs/checkpoints.md`.
 
 ## Verdict: NOT READY (components ready, wiring missing)

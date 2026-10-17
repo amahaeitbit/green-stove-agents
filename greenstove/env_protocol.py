@@ -5,7 +5,7 @@ re-exports them and defines the one protocol the agent layer talks to.
 GREENSTOVE_WORLD selects the world: "stub" (default, labeled development stand-in with
 battery, actual weather and energy bound), "abel" (Abel's households, allocator, C0 power-only
 simulator and verifier) or "abel-admission" (Abel's households, allocator and admission ledger
-for every phase; energy verdict by Abel's independent admission verifier).
+for every phase; independent energy verification and shared execution/acceptance loop).
 """
 from __future__ import annotations
 
@@ -49,7 +49,7 @@ def load_environment(prefer_stub: bool = False) -> Environment:
         from greenstove.world_adapter import AbelC0World
         return AbelC0World()
     if not prefer_stub and world == "abel-admission":
-        from greenstove.admission_world import AdmissionWorld    # Abel's bridge: partner simulation + his independent verifier
+        from greenstove.admission_world import AdmissionWorld
         return AdmissionWorld()
     from greenstove.stub_env import StubEnvironment
     return StubEnvironment()
