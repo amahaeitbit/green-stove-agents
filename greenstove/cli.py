@@ -329,27 +329,72 @@ def cmd_eval_agents(a) -> int:
 
 
 def cmd_e2e(a) -> int:
-    """smoke -> warmup -> freeze -> held-out A/B/C -> recorded demo, in one isolated data folder."""
+    """Complete end to end in one isolated folder: every event resource, required steps stop the run."""
     stamp = time.strftime("%Y%m%d-%H%M%S")
     root = data_dir() / f"e2e-{stamp}"
     os.environ["GREENSTOVE_DATA_DIR"] = str(root.relative_to(ROOT))
+    live = a.mode in ("live", "crusoe")
     mode = ["--mode", a.mode] if a.mode else []
-    steps = [("smoke", ["smoke"] + mode), ("warmup", ["warmup"] + mode),
-             ("freeze", ["freeze", "--out", str(root / "freeze")]),
-             ("eval-agents", ["eval-agents", "--freeze", str(root / "freeze"), "--out", str(root / "eval"),
-                              "--days", str(a.days)] + mode)]
-    if not a.skip_demo:
-        steps.append(("demo", ["demo"] + mode))
-    for name, argv in steps:
+    day = a.date or time.strftime("%Y-%m-%d", time.localtime(time.time() + 86400))
+    fc = root / "forecast" / f"asmara-eritrea-{day}-{'live' if live else 'mock'}.json"
+    has_runner = "runner" in _subcommands()
+    steps = [  # (name, argv, required, what it shows)
+        ("preflight", ["preflight"] + mode, False, "readiness: keys, spend flag, model id, world, tests"),
+        ("smoke", ["smoke"] + mode, True, "one structured Crusoe call recorded"),
+        ("models", ["models"], False, "Crusoe catalog: exact Nemotron ids and pricing") if live else None,
+        ("bench", ["bench", "--n", "2"] + mode, False, "Nemotron model chosen by measurement"),
+        ("forecast", ["forecast", "--date", day] + mode, False, "You.com + Nemotron forecast -> solar profile"),
+        ("decide-forecast", ["decide", "--forecast", str(fc), "--condition", "A"] + mode, False,
+         "Done Means Done: one day planned on the forecast, decision.md"),
+        ("warmup", ["warmup"] + mode, True, "Shared Brain written from development days"),
+        ("freeze", ["freeze", "--out", str(root / "freeze")], True, "brain snapshot + raw history hashed"),
+        ("eval-agents", ["eval-agents", "--freeze", str(root / "freeze"), "--out", str(root / "eval"),
+                         "--days", str(a.days)] + mode, True, "Shared Brain: A/B/C on held-out days"),
+        ("evolve", ["evolve", "--rounds", "2"] + mode, False, "Version N+1: playbook kept only if it helps"),
+        ("before-after", ["playbook", "before-after"] + mode, False, "Version N+1: held-out before/after"),
+        ("runner-event", ["event", "day_start", "--date", day, "--scenario", "demo-handoff-overcast"], False,
+         "always-on: enqueue a day_start event") if has_runner else None,
+        ("runner", ["runner", "--once"] + mode, False, "always-on: event processed, zero idle calls") if has_runner else None,
+        ("demo", ["demo"] + mode, True, "recorded demo transcript"),
+        ("usage", ["usage"], False, "calls, tokens, cache hits, latency, cost"),
+    ]
+    results, warned, failed = [], [], []
+    for step in filter(None, steps):
+        name, argv, required, what = step
         console.rule(f"[bold]e2e · {name}")
-        code = main(argv)
-        if code != 0:
-            console.print(f"[red]e2e stopped at {name} (exit {code})[/]; records so far in {root.relative_to(ROOT)}")
-            return code
-    console.rule("[bold green]e2e complete")
-    console.print(f"everything is under {root.relative_to(ROOT)}: smoke/, evidence/, brain/, freeze/, eval/, demo/")
-    return 0
+        try:
+            code = main(argv)
+        except SystemExit as exc:                 # argparse errors in optional steps
+            code = exc.code if isinstance(exc.code, int) else 2
+        status = "ok" if code == 0 else ("FAILED" if required else f"skipped/warn (exit {code})")
+        results.append((name, status, what))
+        if not required and code != 0:
+            warned.append(name)
+        if code != 0 and required:
+            failed.append(name)
+            break
+    lines = [f"# End-to-end run {stamp}", "", f"Model: {'LIVE Crusoe' if live else 'MOCK (rule-based stand-in)'} · "
+             f"world: {load_environment().name} · forecast day {day}", "", "| Step | Status | Shows |", "| --- | --- | --- |"]
+    lines += [f"| {n} | {s} | {w} |" for n, s, w in results]
+    lines += ["", "Outputs: smoke/, crusoe/, forecast/, evidence/ (runs, decision.md), brain/, freeze/, eval/, playbook/, "
+              "events/, demo/, usage.jsonl"]
+    (root / "e2e-summary.md").write_text("\n".join(lines) + "\n")
+    console.rule("[bold]e2e summary")
+    for n, s, w in results:
+        console.print(f"{n:16} {s:24} {w}", markup=False)
+    console.print(f"summary: {(root / 'e2e-summary.md').relative_to(ROOT)}")
+    return 1 if failed else 0
 
+
+def _subcommands() -> set[str]:
+    p = argparse.ArgumentParser()
+    sub = p.add_subparsers(dest="cmd")
+    try:
+        from greenstove import runner
+        runner.register(sub)
+    except ImportError:
+        return set()
+    return set(sub.choices)
 
 def cmd_demo(a) -> int:
     from greenstove import demo
@@ -409,7 +454,8 @@ def main(argv: list[str] | None = None) -> int:
     s.set_defaults(fn=cmd_eval_agents)
     s = sub.add_parser("e2e", help="smoke, warmup, freeze, held-out A/B/C, recorded demo")
     s.add_argument("--mode", choices=["mock", "live", "crusoe"]); s.add_argument("--days", type=int, default=8)
-    s.add_argument("--skip-demo", action="store_true"); s.set_defaults(fn=cmd_e2e)
+    s.add_argument("--skip-demo", action="store_true"); s.add_argument("--date", help="forecast day YYYY-MM-DD")
+    s.set_defaults(fn=cmd_e2e)
     from greenstove import evolve
     evolve.register(sub)                          # playbook show|history|before-after, evolve (Version N+1)
     try:
