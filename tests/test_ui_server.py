@@ -137,3 +137,13 @@ def test_reset_last(base):
     assert ev == []
     _, sc = call(base, "/api/scenario", {"name": "dev-partly-cloudy-mid"})
     assert next(h for h in sc["households"] if h["household_id"] == "hh-04")["max_cost"] != 9.5
+
+
+def test_presenter_assets_allow_list(base):
+    for path, ctype in ui_server.STATIC.items():
+        if (ui_server.UI_FILE.parent / path.lstrip("/")).exists():
+            with urllib.request.urlopen(base + path, timeout=10) as r:
+                assert r.status == 200 and ctype in r.headers["Content-Type"]
+    # only the fixed allow-list is served; nothing from the request path reaches the filesystem
+    for path in ("/index.css", "/../ui_server.py", "/ui/present.js", "/present.js/../index.html"):
+        assert call(base, path)[0] == 404

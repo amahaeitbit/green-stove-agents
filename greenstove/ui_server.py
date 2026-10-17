@@ -37,6 +37,8 @@ from greenstove.scenarios import (DEFAULT_REQUIREMENTS, DEMO_SCENARIOS, DEV_SCEN
                                   make_actual)
 
 UI_FILE = Path(__file__).resolve().parent / "ui" / "index.html"
+# Presenter layer next to the page (fixed allow-list; never a path from the request).
+STATIC = {"/present.css": "text/css", "/present.js": "text/javascript"}
 PLACEHOLDER = ("<!doctype html><html><head><meta charset='utf-8'><title>Green-Stove UI</title></head>"
                "<body><h1>Green-Stove Agents</h1><p>The UI page (greenstove/ui/index.html) is not built yet. "
                "The JSON API is live at <a href='/api/state'>/api/state</a>.</p></body></html>")
@@ -513,6 +515,11 @@ class Handler(BaseHTTPRequestHandler):
             if method == "GET" and url.path in ("/", "/index.html"):
                 html = UI_FILE.read_text() if UI_FILE.exists() else PLACEHOLDER
                 return self._send(200, html, "text/html")
+            if method == "GET" and url.path in STATIC:
+                asset = UI_FILE.parent / url.path.lstrip("/")
+                if not asset.exists():
+                    raise ApiError(404, f"no file {url.path}")
+                return self._send(200, asset.read_text(), STATIC[url.path])
             route = ROUTES.get((method, url.path))
             if route is None:
                 raise ApiError(404, f"no route {method} {url.path}")

@@ -23,8 +23,11 @@ def test_no_external_resources(html):
     assert not re.search(r"""(?:src|href)\s*=\s*["']?\s*(?:https?:)?//""", html, re.I)
     assert not re.search(r"""url\(\s*["']?\s*(?:https?:)?//""", html, re.I)
     assert "@import" not in html
-    assert not re.search(r"<link[^>]+stylesheet", html, re.I)
-    assert not re.search(r"<script[^>]+src=", html, re.I)
+    # the only linked files are the same-origin presenter layer the server serves from its allow-list
+    links = re.findall(r"<link[^>]+stylesheet[^>]*>", html, re.I)
+    scripts = re.findall(r"<script[^>]+src=[^>]*>", html, re.I)
+    assert [re.search(r'href="([^"]+)"', x).group(1) for x in links] in ([], ["/present.css"])
+    assert [re.search(r'src="([^"]+)"', x).group(1) for x in scripts] in ([], ["/present.js"])
 
 
 @pytest.mark.parametrize("panel", ["panel-households", "panel-agent", "panel-brain", "panel-tools"])
