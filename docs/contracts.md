@@ -181,3 +181,25 @@ mapping. A pending offer is not an accepted booking or completed session. The en
 branch does not implement delivery, a message broker, external agent protocol, or manual
 approval. The partner's adapter/supervisor must wire delivery, preserve identifiers and
 honor coverage.complete before advertising verified grid service.
+
+## Battery-backed start admission
+
+The team agreed to delay starts instead of interrupting cooking under the fixed simulation
+model. [admission-policy.md](admission-policy.md) defines the environment-side implementation.
+The local supervisor must distinguish a booked reservation from an admitted session.
+Before a start, can_start checks stored energy for the entire session, outstanding active
+commitments and essential demand through the end of day. Future solar receives no credit.
+The battery floor is a hard discharge bound for every load; essential shortages are recorded.
+
+Admission uses separate immutable records in admission_models.py, preserving the C0
+allocator/simulator interfaces. Persist each returned state before another admission or
+dispatch. The supervisor owns serialization; it must not admit concurrent sessions from
+the same stale snapshot. ADMIT commits resources, DEFER requests a permitted alternative,
+and UNSERVED means no in-window retry remains. Pending offers cannot start. Repricing,
+household approval and delivery are integration responsibilities, not implicit permissions.
+
+BatterySpec declares explicit efficiencies and charge/discharge power limits. Its capacity
+and floor match context configuration. Interval accounting consumes energy and releases
+remaining commitments once, charges from observed surplus, records curtailment and essential
+shortages, and marks completion only after delivery. Full phase integration and independent
+energy verification remain pending; the C0 coverage flag stays incomplete.

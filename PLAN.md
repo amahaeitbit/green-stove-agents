@@ -80,6 +80,14 @@ Acceptance: one 1 kW session for 30 minutes uses 0.5 kWh before system losses; a
 
 ### A2. Allocate and verify
 
+Current next increment: battery-backed start admission is implemented separately in
+admission.py/admission_models.py; see [admission-policy.md](docs/admission-policy.md).
+The team chose to defer starts instead of interrupting admitted sessions under fixed
+profiles. Essential demand through end of day and existing cooking commitments are
+protected above the hard battery floor, with no future solar admission credit. Full
+simulator/verifier/adapter integration is still a joint gate; C0 is not upgraded to full
+energy coverage by this increment.
+
 For each tariff, households score starts using quoted cost plus configured inconvenience, within acceptable windows. Use a fixed tie-breaking rule. Allocate reservations deterministically under forecast constraints; accept only when authorized. Record every unserved request and reason. For a quote crossing tier boundaries, integrate energy at each interval's price. Lock the quote on acceptance.
 
 Check interval inverter limits, battery power limits, reserve, essential-load service, budget, and household windows. Do not silently clip away an energy deficit. Verify from the trace, and return machine-readable feedback codes. Keep the allocator identical in every condition.
