@@ -14,12 +14,23 @@ from greenstove.agent_models import (AttemptRecord, Brief, EvidenceRecord, Execu
                                      RunPhase, RunRecord, situation_of)
 from greenstove.brain import briefs, keeper
 from greenstove.brain.store import BrainStore
-from greenstove.env_protocol import ActualScenario, Environment, Requirements, ScenarioContext, Verdict
+from greenstove.env_protocol import ActualScenario, ContractError, Environment, Requirements, ScenarioContext, Verdict
 from greenstove.evidence import EvidenceStore
 from greenstove.llm import LLMClient, ModelError
 from greenstove.pricing_agent import hhmm
 
 FORECAST_PHASES = ("forecast_expected", "forecast_downside")
+
+
+def complete_pass(v: Verdict) -> bool:
+    """A pass counts only if the world checked everything (Abel's C0 world is power-only)."""
+    cov = getattr(v, "coverage", None)
+    return v.passed and (cov is None or cov.complete)
+
+
+def _put(evidence: EvidenceStore, ev: EvidenceRecord) -> None:
+    if evidence.get(ev.run_id) is None:          # verdict ids are deterministic: identical evaluation, one record
+        evidence.put(ev)
 
 
 def make_brief(mode: MemoryMode, role: str, context: ScenarioContext, brain: BrainStore | None,
@@ -112,19 +123,31 @@ def run_agent_day(context: ScenarioContext, memory_mode: MemoryMode, requirement
             plan = env.allocate(requests, proposal.prices, context, pid)
             evidence.write(run_id, f"tariff_{n}", proposal)
             evidence.write(run_id, f"reservations_{n}", plan)
-            verdicts = []
+            verdicts, unmodeled = [], []
             for ph in FORECAST_PHASES:
-                v = env.verify(env.simulate(plan, context, ph), requirements, context, plan)
+                try:
+                    v = env.verify(env.simulate(plan, context, ph), requirements, context, plan)
+                except ContractError as exc:             # world does not model this phase (e.g. Abel's C0)
+                    unmodeled.append(ph)
+                    evidence.write(run_id, f"unmodeled_{n}_{ph}", {"phase": ph, "error": str(exc)[:200]})
+                    continue
                 evidence.write(run_id, f"verdict_{n}_{ph}", v)
                 rec.simulator_runs += 1
                 ev = _evidence(v, run_id, context, sit, proposal.prices, pid)
-                evidence.put(ev)
+                _put(evidence, ev)
                 run_records.append(ev)
                 att.evidence_ids.append(ev.run_id)
                 verdicts.append(v)
             rec.candidate_evaluations += 1
-            att.passed = all(v.passed for v in verdicts)
+            att.passed = bool(verdicts) and not unmodeled and all(complete_pass(v) for v in verdicts)
             att.feedback = sorted({f.code for v in verdicts for f in v.feedback_codes})
+            if not att.passed and verdicts and all(v.passed for v in verdicts):
+                att.feedback.append("INCOMPLETE_COVERAGE")
+                scope = getattr(verdicts[0].coverage, "scope", "unknown")
+                missing = f"; phases not modeled: {', '.join(unmodeled)}" if unmodeled else ""
+                rec.reason = (f"checked conditions passed at attempt {n}, but the world's coverage is incomplete "
+                              f"({scope}{missing}); not a verified plan")
+                break
             if att.passed:
                 rec.status, rec.reason = "PLAN_VERIFIED", f"verified at attempt {n}"
                 rec.selected_proposal_id, rec.selected_tariff = pid, proposal.prices
@@ -137,13 +160,18 @@ def run_agent_day(context: ScenarioContext, memory_mode: MemoryMode, requirement
         rec.status, rec.reason = "ERROR", f"model_error: {exc}"
 
     if selected_plan is not None and actual is not None:
-        v = env.verify(env.simulate(selected_plan, context, "actual", actual), requirements, context, selected_plan)
-        evidence.write(run_id, "verdict_actual", v)
-        rec.simulator_runs += 1
-        ev = _evidence(v, run_id, context, sit, rec.selected_tariff or {}, rec.selected_proposal_id or "")
-        evidence.put(ev)
-        run_records.append(ev)
-        rec.execution = ExecutionRecord(outcome_passed=v.passed, evidence_id=ev.run_id, metrics=dict(v.metrics))
+        try:
+            v = env.verify(env.simulate(selected_plan, context, "actual", actual), requirements, context, selected_plan)
+        except ContractError as exc:
+            rec.reason += f"; actual execution not modeled by this world ({str(exc)[:60]})"
+        else:
+            evidence.write(run_id, "verdict_actual", v)
+            rec.simulator_runs += 1
+            ev = _evidence(v, run_id, context, sit, rec.selected_tariff or {}, rec.selected_proposal_id or "")
+            _put(evidence, ev)
+            run_records.append(ev)
+            rec.execution = ExecutionRecord(outcome_passed=complete_pass(v), evidence_id=ev.run_id,
+                                            metrics=dict(v.metrics))
 
     if run_records and (write_notes or phase == "evaluation") and rec.status != "ERROR":
         _write_notes(rec, run_records, context, brain, evidence, llm, phase, write_notes, brief_budget, keeper_ttl_days)

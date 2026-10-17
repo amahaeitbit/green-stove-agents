@@ -5,7 +5,7 @@ from greenstove.pricing_agent import build_payload, mock_pricing, validate
 
 def ctx():
     return ScenarioContext(
-        scenario_id="t", config_hash="c", weather_class="overcast", initial_battery_kwh=2, battery_capacity_kwh=6,
+        scenario_id="t", config_hash="c", scenario_hash="s", weather_class="overcast", initial_battery_kwh=2, battery_capacity_kwh=6,
         reserve_kwh=1.2, inverter_kw=3, forecast_pv_kw=[1.0] * 96, downside_pv_kw=[0.75] * 96,
         essential_load_kw=[0.12] * 96,
         requests=[HouseholdRequest(request_id="r1", household_id="h1", power_kw=1, duration_steps=2,

@@ -27,7 +27,7 @@ import json
 import math
 import random
 
-from greenstove.env_protocol import (
+from greenstove.env_protocol import (compute_scenario_hash, 
     STEPS, ActualScenario, HouseholdRequest, Requirements, ScenarioContext,
     TariffWindow,
 )
@@ -154,16 +154,19 @@ def make_context(seed: int, weather_class: str, battery_frac: float, demand_scal
     cap = STATION["battery_capacity_kwh"]
     sid = scenario_id or (f"stub-{weather_class}-s{seed}-b{battery_frac:g}"
                           f"-ds{demand_scale:g}-fs{flex_scale:g}-d{day}")
-    return ScenarioContext(
+    data = dict(
         scenario_id=sid, config_hash=config_hash(), day=day, weather_class=weather_class,
         initial_battery_kwh=round(cap * battery_frac, 4), battery_capacity_kwh=cap,
         reserve_kwh=STATION["reserve_kwh"], inverter_kw=STATION["inverter_kw"],
         forecast_pv_kw=forecast,
         downside_pv_kw=[round(p * DOWNSIDE_FACTOR, 4) for p in forecast],
         essential_load_kw=[STATION["essential_kw"]] * STEPS,
-        requests=_requests(demand_scale, flex_scale),
-        windows=[w.model_copy() for w in WINDOWS],
-        lattice={k: list(v) for k, v in LATTICE.items()}, tier_order=list(TIER_ORDER))
+        requests=[r.model_dump() for r in _requests(demand_scale, flex_scale)],
+        windows=[w.model_dump() for w in WINDOWS],
+        lattice={k: list(v) for k, v in LATTICE.items()}, tier_order=list(TIER_ORDER),
+        assumptions=["synthetic development stand-in scenario (stub world), not pilot data"])
+    data["scenario_hash"] = compute_scenario_hash(data)
+    return ScenarioContext.model_validate(data)
 
 
 def make_actual(context: ScenarioContext, seed: int) -> ActualScenario:

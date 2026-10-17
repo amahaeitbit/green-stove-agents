@@ -204,8 +204,10 @@ def load(path: Path) -> ForecastRecord:
 def context_from_forecast(record: ForecastRecord, base: ScenarioContext) -> ScenarioContext:
     """Same station, households and rules; forecast PV and weather class from the record."""
     slug = re.sub(r"[^a-z0-9]+", "-", record.place.lower()).strip("-")
-    return base.model_copy(update={"scenario_id": f"fc-{slug}-{record.date}", "weather_class": record.weather_class,
-                                   "forecast_pv_kw": record.forecast_pv_kw, "downside_pv_kw": record.downside_pv_kw})
+    from greenstove.env_protocol import with_scenario_hash
+    return with_scenario_hash(base.model_copy(update={
+        "scenario_id": f"fc-{slug}-{record.date}", "weather_class": record.weather_class,
+        "forecast_pv_kw": record.forecast_pv_kw, "downside_pv_kw": record.downside_pv_kw}))
 
 
 def summary_lines(record: ForecastRecord) -> list[str]:

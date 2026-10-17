@@ -52,11 +52,18 @@ def render_decision(ctx: ScenarioContext, run: RunRecord, env: Environment, req:
         plan = env.allocate(env.household_requests(ctx), run.selected_tariff, ctx, run.selected_proposal_id or "")
         out += ["", "## Checks (recomputed by code)", "", "| Forecast | Result | Served | Min battery | Max shift | Spend |",
                 "| --- | --- | --- | --- | --- | --- |"]
+        from greenstove.env_protocol import ContractError
         for ph in ("forecast_expected", "forecast_downside"):
-            v = env.verify(env.simulate(plan, ctx, ph), req, ctx, plan)
+            try:
+                v = env.verify(env.simulate(plan, ctx, ph), req, ctx, plan)
+            except ContractError:
+                out += [f"| {ph.split('_')[1]} | not modeled by this world | | | | |"]
+                continue
             m = v.metrics
-            out += [f"| {ph.split('_')[1]} | {'PASS' if v.passed else 'FAIL'} | {m.get('served_fraction', 0):.2f} | "
-                    f"{m.get('min_battery_kwh', 0):.2f} kWh | {m.get('max_shift_hours', 0):.2f} h | "
+            res = "PASS" if v.passed and v.coverage.complete else ("PASS (partial coverage)" if v.passed else "FAIL")
+            batt = f"{m['min_battery_kwh']:.2f} kWh" if "min_battery_kwh" in m else "not modeled"
+            out += [f"| {ph.split('_')[1]} | {res} | {m.get('served_fraction', 0):.2f} | "
+                    f"{batt} | {m.get('max_shift_hours', 0):.2f} h | "
                     f"{m.get('total_spend', 0):.2f} |"]
         out += ["", "## Bookings", "", "| Household | Slot | kW | Locked cost | Status |", "| --- | --- | --- | --- | --- |"]
         hh = {q.request_id: q for q in ctx.requests}

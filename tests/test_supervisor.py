@@ -3,8 +3,8 @@ import pytest
 
 from greenstove import note_writer, pricing_agent, supervisor
 from greenstove.brain.store import BrainStore
-from greenstove.env_protocol import (Condition, Feedback, InfeasibilityProof, Plan, Requirements, Reservation, Trace,
-                                     Verdict)
+from greenstove.env_protocol import (Condition, Coverage, Feedback, InfeasibilityProof, Plan, Requirements,
+                                     Reservation, Trace, Verdict)
 from greenstove.evidence import EvidenceStore
 from greenstove.llm import LLMClient, LLMSettings
 from tests.test_pricing import ctx
@@ -15,8 +15,9 @@ REQ = Requirements(min_service_fraction=0.75)
 class FakeEnv:
     name = "fake-env (tests)"
 
-    def __init__(self, infeasible=False):
+    def __init__(self, infeasible=False, complete=True):
         self.infeasible = infeasible
+        self.complete, self.scope = complete, "fake-full" if complete else "fake-power-only"
         self.n = 0
 
     def household_requests(self, context):
@@ -24,25 +25,31 @@ class FakeEnv:
 
     def allocate(self, requests, tariff, context, proposal_id):
         r = requests[0]
-        return Plan(proposal_id=proposal_id, reservations=[Reservation(
+        return Plan(proposal_id=proposal_id, tariff=dict(tariff), reservations=[Reservation(
             reservation_id=f"{proposal_id}:{r.request_id}", request_id=r.request_id, start_step=60, end_step=62,
             power_kw=r.power_kw, locked_cost=round(0.5 * tariff["sun"], 2), tariff_version=str(tariff["peak"]),
             accepted=True)])
 
     def simulate(self, plan, context, phase, actual=None):
         peak = float(plan.reservations[0].tariff_version)
-        return Trace(scenario_id=context.scenario_id, phase=phase, proposal_id=plan.proposal_id,
-                     pv_kw=[1.0] * 96, demand_kw=[0.5] * 96, battery_kwh=[2.0 if peak >= 16 else 1.0] * 96)
+        return Trace(simulation_id=f"{plan.proposal_id}:{phase}", scenario_id=context.scenario_id,
+                     config_hash=context.config_hash, scenario_hash=context.scenario_hash, phase=phase,
+                     proposal_id=plan.proposal_id, tariff_version="t", simulator_version="fake",
+                     pv_kw=[1.0] * 96, cooking_kw=[0.5] * 96, demand_kw=[0.5] * 96,
+                     battery_kwh=[2.0 if peak >= 16 else 1.0] * 96)
 
     def verify(self, trace, requirements, context, plan):
         self.n += 1
         ok = min(trace.battery_kwh) >= context.reserve_kwh
         fb = [] if ok else [Feedback(code="BATTERY_RESERVE", interval=76, value=1.0, limit=context.reserve_kwh)]
         return Verdict(run_id=f"{context.scenario_id}:{trace.proposal_id}:{trace.phase}:{self.n}",
-                       scenario_id=context.scenario_id, config_hash=context.config_hash, phase=trace.phase,
+                       simulation_id=trace.simulation_id, scenario_id=context.scenario_id,
+                       config_hash=context.config_hash, scenario_hash=context.scenario_hash, phase=trace.phase,
                        passed=ok, conditions=[Condition(name="battery_reserve", passed=ok)],
                        metrics={"min_battery_kwh": min(trace.battery_kwh), "served_fraction": 1.0},
-                       feedback_codes=fb)
+                       feedback_codes=fb, verifier_version="fake", requirements=requirements,
+                       coverage=Coverage(scope=self.scope, complete=self.complete, phases_checked=[trace.phase],
+                                         not_modeled=[]))
 
     def lower_bound(self, context, requirements):
         return InfeasibilityProof(lower_bound_kwh=9.0, available_kwh=5.0, assumptions=["test"]) if self.infeasible else None
@@ -129,3 +136,9 @@ def test_decision_record_and_run_folder(stores):
     text = render_decision(c, r, FakeEnv(), REQ, brief_lines(r.brief.text))
     assert "Status: PLAN_VERIFIED" in text and "Today's tariff" in text and "Alternatives rejected" in text
     assert "Not decided by the model" in text
+
+
+def test_incomplete_coverage_pass_is_never_plan_verified(stores):
+    r = run(ctx(), "off", stores, env=FakeEnv(complete=False), write_notes=False)
+    assert r.status == "NO_VERIFIED_PLAN" and "coverage is incomplete" in r.reason
+    assert "INCOMPLETE_COVERAGE" in r.attempts[-1].feedback

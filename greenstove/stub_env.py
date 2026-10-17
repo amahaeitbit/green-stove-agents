@@ -21,12 +21,14 @@ import json
 import math
 import uuid
 
-from greenstove.env_protocol import (
+from greenstove.models import tariff_version as world_tariff_version
+from greenstove.env_protocol import (Coverage, short_hash, 
     STEP_HOURS, STEPS, ActualScenario, Condition, Feedback, HouseholdRequest,
     InfeasibilityProof, Plan, Requirements, Reservation, ScenarioContext, Trace, Unserved,
     Verdict,
 )
 
+STUB_VERSION = "stub-env-2"
 STUB_NAME = "stub-env (development stand-in, not Abel's simulator)"
 CHARGE_EFF = DISCHARGE_EFF = 0.95
 PHASES = ("forecast_expected", "forecast_downside", "actual")
@@ -62,7 +64,8 @@ class StubEnvironment:
                  context: ScenarioContext, proposal_id: str) -> Plan:
         prices, version = step_prices(tariff, context), tariff_version(tariff)
         load = list(context.essential_load_kw)            # forecast interval load (kW)
-        plan = Plan(proposal_id=proposal_id, reservations=[], unserved=[])
+        plan = Plan(proposal_id=proposal_id, tariff={k: float(v) for k, v in tariff.items()},
+                    reservations=[], unserved=[])
         seen: set[str] = set()
         for req in sorted(requests, key=lambda r: (r.preferred_start, r.request_id)):
             reason, chosen = None, None
@@ -152,7 +155,12 @@ class StubEnvironment:
                  "pv_to_battery_kwh": round(charged, 6), "battery_out_kwh": round(discharged, 6),
                  "curtailed_kwh": round(curtailed, 6), "served_cooking_kwh": round(served_cook, 6),
                  "interrupted_at": interrupted}            # reservation_id -> interval stopped
-        return Trace(scenario_id=context.scenario_id, phase=phase, proposal_id=plan.proposal_id,
+        sim_id = short_hash({"scenario": context.scenario_hash, "config": context.config_hash, "phase": phase,
+                             "plan": plan.model_dump(mode="json"), "pv": pv, "sim": STUB_VERSION}, 16)
+        return Trace(simulation_id=sim_id, scenario_id=context.scenario_id, config_hash=context.config_hash,
+                     scenario_hash=context.scenario_hash, phase=phase, proposal_id=plan.proposal_id,
+                     tariff_version=world_tariff_version(plan.tariff), simulator_version=STUB_VERSION,
+                     cooking_kw=[round(max(0.0, d - e), 6) for d, e in zip(demand, context.essential_load_kw)],
                      pv_kw=list(pv), demand_kw=demand, battery_kwh=levels, overload_steps=overload,
                      unserved_essential_kwh=round(unserved_ess, 6),
                      unserved_cooking_kwh=round(unserved_cook, 6),
@@ -227,10 +235,15 @@ class StubEnvironment:
                    "min_battery_kwh": min(trace.battery_kwh, default=context.initial_battery_kwh),
                    "overload_steps": float(len(overload)), "max_shift_hours": max_shift,
                    "total_spend": spend, "revenue": spend}
-        run_id = f"{context.scenario_id}:{trace.proposal_id}:{trace.phase}:{uuid.uuid4().hex[:8]}"
-        return Verdict(run_id=run_id, scenario_id=context.scenario_id, config_hash=context.config_hash,
+        run_id = (f"{context.scenario_id}:{trace.proposal_id}:{trace.phase}:"
+                  f"{short_hash([trace.simulation_id, requirements.model_dump(), STUB_VERSION], 8)}")
+        return Verdict(run_id=run_id, simulation_id=trace.simulation_id, scenario_id=context.scenario_id,
+                       config_hash=context.config_hash, scenario_hash=context.scenario_hash,
                        phase=trace.phase, passed=all(c.passed for c in conds), conditions=conds,
-                       metrics=metrics, feedback_codes=fb)
+                       metrics=metrics, feedback_codes=fb, verifier_version=STUB_VERSION,
+                       requirements=requirements,
+                       coverage=Coverage(scope="stub-full", complete=True, phases_checked=[trace.phase],
+                                         not_modeled=["distribution losses", "voltage/phase", "household connection limits"]))
 
     # ---- deterministic infeasibility bound ------------------------------------------
     def lower_bound(self, context: ScenarioContext,

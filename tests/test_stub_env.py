@@ -148,7 +148,8 @@ def test_deterministic_plans_and_verdicts():
     p2, t2, v2 = run(sc.scenario("dev-overcast-low-battery"))
     assert p1 == p2 and t1 == t2
     assert v1.model_dump(exclude={"run_id"}) == v2.model_dump(exclude={"run_id"})
-    assert v1.run_id != v2.run_id and v1.run_id.startswith(f"{c.scenario_id}:p1:forecast_expected:")
+    # identical inputs give the same deterministic evaluation id (contract: Verdict.run_id)
+    assert v1.run_id == v2.run_id and v1.run_id.startswith(f"{c.scenario_id}:p1:forecast_expected:")
 
 
 def test_actual_differs_from_forecast_and_is_seeded():

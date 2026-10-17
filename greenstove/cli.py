@@ -97,6 +97,9 @@ def cmd_smoke(a) -> int:
 def context_for(name: str):
     """Named development/demo scenario; its scenario_id equals the name."""
     from greenstove.scenarios import infeasible_context, scenario
+    if name == "c0-fixture":                      # Abel's C0 fixture (two households, 2 kW inverter)
+        from greenstove.io import load_context
+        return load_context(ROOT / "fixtures" / "c0" / "context.json")
     return infeasible_context() if name == "infeasible" else scenario(name)
 
 
@@ -112,9 +115,10 @@ def cmd_plan(a) -> int:
                                       make_actual, make_context)
     llm, env = make_llm(a.mode), load_environment(prefer_stub=a.stub)
     banner(llm, env.name)
-    named = {**DEV_SCENARIOS, **DEMO_SCENARIOS}
-    if a.scenario != "infeasible" and a.scenario not in named:
-        console.print(f"[red]unknown scenario[/] {a.scenario}; choose from {sorted(named) + ['infeasible']}")
+    from greenstove.scenarios import HELDOUT_SCENARIOS
+    named = {**DEV_SCENARIOS, **DEMO_SCENARIOS, **HELDOUT_SCENARIOS}
+    if a.scenario not in ("infeasible", "c0-fixture") and a.scenario not in named:
+        console.print(f"[red]unknown scenario[/] {a.scenario}; choose from {sorted(named) + ['infeasible', 'c0-fixture']}")
         return 1
     ctx = context_for(a.scenario)
     if getattr(a, "forecast", None):
@@ -125,11 +129,15 @@ def cmd_plan(a) -> int:
                       f"(downside {rec.downside_pv_kwh}) · search {rec.search_mode} · {rec.status}", markup=False)
     evidence, brain = stores()
     actual = make_actual(ctx, seed=ctx.day + 7) if a.execute else None
-    run = supervisor.run_agent_day(ctx, a.brain, DEFAULT_REQUIREMENTS, env=env, llm=llm,
+    req = DEFAULT_REQUIREMENTS
+    if a.scenario == "c0-fixture":                # Abel's fixture comes with its own requirements
+        from greenstove.io import load_requirements
+        req = load_requirements(ROOT / "fixtures" / "c0" / "requirements.json")
+    run = supervisor.run_agent_day(ctx, a.brain, req, env=env, llm=llm,
                                    evidence=evidence, brain=brain, actual=actual)
-    show_run(console, ctx, run, env, DEFAULT_REQUIREMENTS)
+    show_run(console, ctx, run, env, req)
     from greenstove.decision import brief_lines, render_decision
-    text = render_decision(ctx, run, env, DEFAULT_REQUIREMENTS, brief_lines(run.brief.text))
+    text = render_decision(ctx, run, env, req, brief_lines(run.brief.text))
     path = evidence.run_dir(run.agent_run_id) / "decision.md"
     path.write_text(text)
     if getattr(a, "show_decision", False):

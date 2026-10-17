@@ -1,5 +1,17 @@
 # Agent layer: integration notes for Abel
 
+**Status 13:59 PT:** your branch is merged into `agents-memory` (commit 5f49292). The agent
+layer imports your `greenstove/models.py` types (`env_protocol.py` now re-exports them).
+`GREENSTOVE_WORLD=abel` runs agents on your C0 simulator and verifier
+(`greenstove/world_adapter.py`; allocation still from the stub). What happens there today:
+the downside phase and actual execution are recorded as "not modeled", a pass with
+`coverage.complete=false` is reported as "checked conditions passed … not a verified plan"
+(never PLAN_VERIFIED), and on `c0-fixture` both households have `auto_book=false`, so your
+verifier reports `SERVICE_SHORTFALL` until household acceptance exists. Try:
+`GREENSTOVE_WORLD=abel gsa decide --scenario c0-fixture --condition A`.
+The stub world now emits your full types too (scenario_hash, Plan.tariff, Trace and Verdict
+ids, coverage `stub-full`), with deterministic verdict ids.
+
 Branch `agents-memory`. Everything here is the partner's side of [PLAN.md](../PLAN.md)
 section 7. It runs today against `greenstove/stub_env.py`, a labeled development
 stand-in for your world, so the loop, memory and demo could be built before your code

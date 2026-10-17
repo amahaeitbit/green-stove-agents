@@ -73,11 +73,18 @@ def show_run(c: Console, ctx: ScenarioContext, run: RunRecord, env: Environment,
         for u in plan.unserved:
             r.add_row(u.request_id, "-", "-", "-", "-", f"unserved: {u.reason}")
         c.print(r)
-        trace = env.simulate(plan, ctx, "forecast_downside")
+        from greenstove.env_protocol import ContractError
+        try:
+            trace, label = env.simulate(plan, ctx, "forecast_downside"), "downside"
+        except ContractError:
+            trace, label = env.simulate(plan, ctx, "forecast_expected"), "expected; downside not modeled"
         top = max(ctx.inverter_kw, max(trace.demand_kw))
-        c.print(f"demand vs {ctx.inverter_kw} kW limit  |{spark(hourly(trace.demand_kw), top)}|  (00-24h, downside)")
-        c.print(f"battery vs reserve {ctx.reserve_kwh} kWh |{spark(hourly(trace.battery_kwh), ctx.battery_capacity_kwh)}|"
-                f"  min {min(trace.battery_kwh):.2f} kWh")
+        c.print(f"demand vs {ctx.inverter_kw} kW limit  |{spark(hourly(trace.demand_kw), top)}|  (00-24h, {label})")
+        if trace.battery_kwh:
+            c.print(f"battery vs reserve {ctx.reserve_kwh} kWh |{spark(hourly(trace.battery_kwh), ctx.battery_capacity_kwh)}|"
+                    f"  min {min(trace.battery_kwh):.2f} kWh")
+        else:
+            c.print("battery: not modeled by this world")
 
 
 def show_notes(c: Console, run: RunRecord) -> None:
