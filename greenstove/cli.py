@@ -138,7 +138,17 @@ def context_for(name: str):
     ctx = infeasible_context() if name == "infeasible" else scenario(name)
     if os.environ.get("GREENSTOVE_WORLD") == "abel":
         ctx = c0_compatible(ctx)
+    elif os.environ.get("GREENSTOVE_WORLD") == "abel-admission":
+        ctx = admission_variant(ctx)
     return ctx
+
+
+def admission_variant(ctx):
+    """Same scenario under Abel's admission policy: own station hash so memory never mixes worlds."""
+    from greenstove.env_protocol import short_hash, with_scenario_hash
+    return with_scenario_hash(ctx.model_copy(update={
+        "scenario_id": f"{ctx.scenario_id}-adm", "config_hash": short_hash([ctx.config_hash, "abel-admission-policy"], 12),
+        "assumptions": list(ctx.assumptions) + ["evaluated under Abel's battery-backed admission policy"]}))
 
 
 def c0_compatible(ctx):

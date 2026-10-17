@@ -181,7 +181,10 @@ def run_agent_day(context: ScenarioContext, memory_mode: MemoryMode, requirement
                 break
             dod_fail = sorted({c for v in verdicts for c in dod.evaluate(v.metrics)}) if dod is not None else []
             att.passed = bool(verdicts) and not unmodeled and all(complete_pass(v) for v in verdicts) and not dod_fail
-            att.feedback = sorted({f.code for v in verdicts for f in v.feedback_codes} | set(dod_fail))
+            world_codes = {f.code for v in verdicts for f in v.feedback_codes}
+            same = {"DOD_SERVED_FRACTION": "SERVICE_SHORTFALL", "DOD_OVERLOAD_STEPS": "INVERTER_LIMIT",
+                    "DOD_UNSERVED_ESSENTIAL_KWH": "ESSENTIAL_UNSERVED", "DOD_UNSERVED_COOKING_KWH": "BATTERY_RESERVE"}
+            att.feedback = sorted(world_codes | {c for c in dod_fail if same.get(c) not in world_codes})
             only_unchecked = all(c.startswith("DOD_UNCHECKED") for c in dod_fail)
             if not att.passed and verdicts and all(v.passed for v in verdicts) and only_unchecked:
                 att.feedback.append("INCOMPLETE_COVERAGE")

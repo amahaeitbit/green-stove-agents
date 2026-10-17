@@ -3,8 +3,9 @@
 World types now come from Abel's greenstove/models.py (the shared contract); this module
 re-exports them and defines the one protocol the agent layer talks to.
 GREENSTOVE_WORLD selects the world: "stub" (default, labeled development stand-in with
-battery, actual weather and energy bound) or "abel" (Abel's C0 power-only simulator and
-verifier; allocation still from the stub until his allocator lands).
+battery, actual weather and energy bound), "abel" (Abel's households, allocator, C0 power-only
+simulator and verifier) or "abel-admission" (Abel's households, allocator and admission ledger
+for every phase; energy verdict by partner glue, pending Abel's sign-off).
 """
 from __future__ import annotations
 
@@ -40,8 +41,10 @@ class Environment(Protocol):
 
 
 def load_environment(prefer_stub: bool = False) -> Environment:
-    """GREENSTOVE_WORLD=abel -> Abel's C0 world; otherwise the labeled development stub."""
+    """GREENSTOVE_WORLD: stub (default) | abel | abel-admission. Unknown names raise."""
     world = os.environ.get("GREENSTOVE_WORLD", "stub")
+    if world not in ("stub", "abel", "abel-admission"):
+        raise ValueError(f"unknown GREENSTOVE_WORLD={world!r}; use stub, abel or abel-admission")
     if not prefer_stub and world == "abel":
         from greenstove.world_adapter import AbelC0World
         return AbelC0World()

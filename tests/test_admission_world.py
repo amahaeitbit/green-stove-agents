@@ -37,3 +37,27 @@ def test_deterministic_and_predawn_infeasibility_proof():
     proof = W.lower_bound(scenario("ho-clear-low-battery"), DEFAULT_REQUIREMENTS)
     assert proof is not None and proof.lower_bound_kwh > proof.available_kwh
     assert W.lower_bound(scenario("dev-clear-full"), DEFAULT_REQUIREMENTS) is None
+
+
+def test_review_fixes_feedback_requirements_and_world_name(monkeypatch):
+    from greenstove.env_protocol import Requirements, load_environment
+    c, p, vs = check("dev-overcast-low-battery", {"standard": 8.0, "sun": 4.0, "peak": 13.0})
+    for v in vs:                                   # pending approvals are not refusals; zero kWh keeps its limit
+        assert all(f.code != "APPROVAL_REQUIRED" for f in v.feedback_codes)
+        assert all(f.limit is not None for f in v.feedback_codes if f.code == "BATTERY_RESERVE")
+        assert "pending_approval_sessions" in v.metrics
+    strict = Requirements(min_service_fraction=0.75, max_shift_hours=1.0)
+    trace = W.simulate(p, c, "forecast_expected")    # simulated under other requirements
+    v = W.verify(trace, strict, c, p)
+    assert v.requirements == strict and v.conditions                 # re-simulated under the given rules
+    monkeypatch.setenv("GREENSTOVE_WORLD", "abel_admission")
+    import pytest
+    with pytest.raises(ValueError):
+        load_environment()
+
+
+def test_admission_variant_has_its_own_hash(monkeypatch):
+    from greenstove import cli
+    monkeypatch.setenv("GREENSTOVE_WORLD", "abel-admission")
+    a, base = cli.context_for("dev-clear-full"), scenario("dev-clear-full")
+    assert a.config_hash != base.config_hash and a.scenario_id.endswith("-adm")

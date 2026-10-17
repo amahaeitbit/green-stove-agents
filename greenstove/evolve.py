@@ -160,6 +160,13 @@ def review(playbook: str, pairs: list[tuple[RunRecord, dict]], llm: LLMClient,
 
 # ---- gate --------------------------------------------------------------------------------
 
+_DOD = None                                       # frozen definition of done (set by the CLI), same for every version
+
+
+def set_definition_of_done(dod) -> None:
+    global _DOD
+    _DOD = dod
+
 def run_playbook_days(text: str, names: list[str], env: Environment, llm: LLMClient, *,
                       requirements: Requirements | None = None, contexts: Callable | None = None,
                       actuals: Callable | None = None, out_dir: Path | None = None,
@@ -179,7 +186,8 @@ def run_playbook_days(text: str, names: list[str], env: Environment, llm: LLMCli
             ctx = contexts(name)
             run = supervisor.run_agent_day(ctx, CONDITION, requirements, env=env, llm=llm, evidence=evidence,
                                            brain=None, history=[], phase="development", actual=actuals(name),
-                                           max_attempts=max_attempts, write_notes=False, playbook=text)
+                                           max_attempts=max_attempts, write_notes=False, playbook=text,
+                                           dod=_DOD)
             pairs.append((run, situation_of(ctx)))
         with (Path(out_dir) / "runs.jsonl").open("w") as f:
             for run, _ in pairs:                     # playbook hash returned alongside each RunRecord
@@ -360,11 +368,13 @@ def render_before_after(result: dict[str, Any], final_text: str) -> str:
 
 def _setup(mode: str | None, stub: bool):
     from greenstove import cli
+    from greenstove.scenarios import DEFAULT_REQUIREMENTS
     from greenstove.env_protocol import load_environment
     llm = cli.make_llm(mode)
     llm.mock_handlers.setdefault(ROLE, mock_reviewer)
     env = load_environment(prefer_stub=stub)
     cli.banner(llm, env.name)
+    set_definition_of_done(cli.current_spec(llm, DEFAULT_REQUIREMENTS))   # same "done" for every version
     return cli, llm, env, cli.data_dir() / "playbook"
 
 

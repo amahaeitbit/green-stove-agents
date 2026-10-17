@@ -36,8 +36,6 @@ class AbelC0World:
 # ledger drive a full-day simulation for every phase (expected, downside, actual). The energy
 # verdict below is partner glue over Abel's ledger results, pending Abel's joint sign-off.
 # ---------------------------------------------------------------------------------------
-import math as _math
-
 from greenstove import admission, billing
 from greenstove.admission_models import BatterySpec
 from greenstove.env_protocol import Condition, ContractError, Coverage, Feedback, short_hash
@@ -91,7 +89,10 @@ class AdmissionWorld:
         error = None
         for t in range(96):
             for r in sorted(starts.get(t, []), key=lambda r: r.request_id):
-                d = admission.can_start(r, plan.tariff, context, state, spec, requirements=self.requirements)
+                try:
+                    d = admission.can_start(r, plan.tariff, context, state, spec, requirements=self.requirements)
+                except ContractError as exc:                 # an upstream contract break is a bug, not a phase gap
+                    raise RuntimeError(f"admission contract violated at step {t}: {exc}") from exc
                 decisions.append({"reservation_id": r.reservation_id, "request_id": r.request_id, "step": t,
                                   "status": d.status, "reason": d.reason,
                                   "required_kwh": d.required_storage_kwh, "available_kwh": d.available_storage_kwh})
@@ -109,8 +110,11 @@ class AdmissionWorld:
                 battery += [battery[-1] if battery else state.battery_kwh] * (96 - t)
                 break
             battery.append(round(state.battery_kwh, 6))
+        done_requests = set(state.completed_request_ids)
+        by_id = {r.reservation_id: r for r in plan.reservations}
         for rid in admitted_ids:
-            outcomes[rid] = "completed" if error is None else "interrupted"
+            finished = error is None or by_id[rid].request_id in done_requests
+            outcomes[rid] = "completed" if finished else "interrupted"
         demand = [round(c + e, 6) for c, e in zip(cooking, context.essential_load_kw)]
         not_started = [r for r in plan.reservations if r.accepted and r.reservation_id not in admitted_ids]
         sim_id = short_hash({"plan": plan.model_dump(mode="json"), "scenario": context.scenario_hash,
@@ -126,14 +130,21 @@ class AdmissionWorld:
                      unserved_cooking_kwh=round(sum(r.power_kw * (r.end_step - r.start_step) * 0.25 for r in not_started), 6),
                      reservation_outcomes=outcomes,
                      extra={"admission": decisions, "ledger_error": error, "floor_kwh": spec.floor_kwh,
-                            "battery_spec": spec.model_dump()})
+                            "battery_spec": spec.model_dump(), "admitted": len(admitted_ids),
+                            "requirements": self.requirements.model_dump()})
 
     def verify(self, trace: Trace, requirements: Requirements, context: ScenarioContext, plan: Plan) -> Verdict:
         if (trace.scenario_id, trace.proposal_id) != (context.scenario_id, plan.proposal_id):
             raise ContractError("trace does not belong to this plan/context")
+        if trace.extra.get("requirements") != requirements.model_dump():   # never judge with other rules
+            self.use_requirements(requirements)
+            actual = ActualScenario(actual_pv_kw=list(trace.pv_kw)) if trace.phase == "actual" else None
+            trace = self.simulate(plan, context, trace.phase, actual)
         req = {q.request_id: q for q in context.requests}
         done = [r for r in plan.reservations if trace.reservation_outcomes.get(r.reservation_id) == "completed"]
-        refused = [d for d in trace.extra.get("admission", []) if d["status"] != "ADMIT"]
+        decisions = trace.extra.get("admission", [])
+        pending = [d for d in decisions if d["reason"] == "APPROVAL_REQUIRED"]     # waiting for the household
+        refused = [d for d in decisions if d["status"] != "ADMIT" and d["reason"] != "APPROVAL_REQUIRED"]
         energy_refusals = [d for d in refused if d["reason"] in _ENERGY_REASONS]
         served = len(done) / max(1, len(context.requests))
         shifts = [abs(r.start_step - req[r.request_id].preferred_start) * 0.25 for r in done]
@@ -154,8 +165,18 @@ class AdmissionWorld:
                       value=max(shifts, default=0.0), limit=requirements.max_shift_hours),
             Condition(name="budget", passed=not over_budget, value=float(len(over_budget)), limit=0)]
         fb = [Feedback(code=_REASON_CODE.get(d["reason"], d["reason"]), interval=d["step"], request_id=d["request_id"],
-                       value=d["required_kwh"] or None, limit=d["available_kwh"] or None,
-                       message=f"admission {d['status']} ({d['reason']})") for d in refused[:6]]
+                       value=d["required_kwh"], limit=d["available_kwh"],
+                       message=f"admission {d['status']} ({d['reason']}): needs {d['required_kwh']:.2f} kWh "
+                               f"above the floor, {d['available_kwh']:.2f} available") for d in refused[:6]]
+        for u in plan.unserved:                    # price signal: no affordable start / no capacity left
+            fb.append(Feedback(code={"UNSERVED_BUDGET": "BUDGET_EXCEEDED", "UNSERVED_CAPACITY": "INVERTER_LIMIT"}.get(
+                u.reason, u.reason), request_id=u.request_id, message=f"allocator: {u.reason}"))
+        for r in over_budget:
+            fb.append(Feedback(code="BUDGET_EXCEEDED", request_id=r.request_id, value=quotes[r.reservation_id],
+                               limit=req[r.request_id].max_cost))
+        if max(shifts, default=0) > requirements.max_shift_hours + 1e-9:
+            fb.append(Feedback(code="OUTSIDE_WINDOW", value=max(shifts), limit=requirements.max_shift_hours,
+                               message="a booked start is shifted more than allowed"))
         if trace.overload_steps:
             fb.append(Feedback(code="INVERTER_LIMIT", interval=trace.overload_steps[0]))
         if (trace.unserved_essential_kwh or 0) > requirements.essential_unserved_kwh + 1e-9:
@@ -164,8 +185,10 @@ class AdmissionWorld:
             fb.append(Feedback(code="SERVICE_SHORTFALL", value=served, limit=requirements.min_service_fraction,
                                message=f"{len(done)} of {len(context.requests)} requests cooked"))
         metrics = {"served_fraction": round(served, 6), "completed_sessions": float(len(done)),
-                   "requested_sessions": float(len(context.requests)), "admitted_sessions": float(len(done)),
+                   "requested_sessions": float(len(context.requests)),
+                   "admitted_sessions": float(trace.extra.get("admitted", len(done))),
                    "deferred_sessions": float(sum(d["status"] == "DEFER" for d in refused)),
+                   "pending_approval_sessions": float(len(pending)),
                    "unserved_cooking_kwh": trace.unserved_cooking_kwh or 0.0,
                    "unserved_essential_kwh": trace.unserved_essential_kwh or 0.0, "min_battery_kwh": round(min_batt, 6),
                    "overload_steps": float(len(trace.overload_steps)), "max_shift_hours": max(shifts, default=0.0),
@@ -190,7 +213,7 @@ class AdmissionWorld:
         above_floor = max(0.0, context.initial_battery_kwh - spec.floor_kwh) * spec.discharge_efficiency
         if need - requirements.essential_unserved_kwh > above_floor + 1e-9:
             return InfeasibilityProof(lower_bound_kwh=round(need, 4), available_kwh=round(above_floor, 4), assumptions=[
-                f"essential load before downside PV covers it (steps 0-{t}) must come from storage above the floor",
+                f"essential load before downside PV covers it (steps 0-{max(0, t - 1)}) must come from storage above the floor",
                 f"floor {spec.floor_kwh} kWh (Abel's admission policy), discharge efficiency {spec.discharge_efficiency}",
                 "optimistic: no cooking at all before sunrise"])
         from greenstove.stub_env import StubEnvironment     # world-independent energy bound (optimistic)
