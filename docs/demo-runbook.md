@@ -51,25 +51,29 @@ Q&A props: `gsa decide` shows the full decision an operator would get for one da
 The full pipeline (warm-up, freeze, held-out A/B/C, demo) is one command:
 `python -m greenstove e2e --mode crusoe`. See [end-to-end.md](end-to-end.md).
 
-## Live sequence (3:00)
+## Live sequence (3:00): eight acts
 
-Run everything from one process so the proposal and memory scenes share a run:
-`python -m greenstove demo --mode crusoe --pause` (Enter moves to the next scene). Show
-Abel's results table between the handoff and infeasible scenes.
+Before the demo: `gsa evolve --rounds 2` and `gsa playbook before-after` (Act 8 reads them).
+Then run `gsa demo --mode live --pause` (Enter moves to the next act). Every act opens with
+the question it answers and closes with a green ✓ line saying what it proved, computed from
+the run (it never claims a saving that did not happen). The closing card, "What the demo
+proved", maps each claim to its track requirement and evidence, including the sponsor tools.
 
-| Time | Scene | Speaker | Say |
+| Time | Act | Speaker | Say |
 | --- | --- | --- | --- |
-| 0:00–0:10 | `goal` | Partner | One line of goal; the Spec Agent turned it into checks the agents run without us; code tightened one and added one |
-| 0:10–0:25 | `world` | Abel | Households differ in power, duration, window, budget and whether they auto-book; the station has fixed limits |
-| 0:25–0:55 | `proposal` | Partner | A fresh Pricing Agent on Crusoe proposes prices; code allocates and verifies on expected and downside forecasts; failures come back with named codes; the decision trail reads re-plan → re-plan → continue; reservations are capacity-backed |
-| 0:55–1:25 | `memory` | Partner | The Note-writer proposes observations; the Keeper rebuilds facts from evidence ids and admits them; a fabricated note is rejected for an unsupported number |
-| 1:25–1:55 | `handoff` | Partner | A new agent on a different scenario reads the brief (entry ids shown), cites entries and is verified; brain off on the same scenario for contrast; one example, not the evidence |
-| 1:55–2:30 | results *(Abel)* | Abel | All six conditions on held-out days, including nearest reuse and search, with service and effort |
-| 2:30–2:45 | `infeasible` | Abel | A deterministic energy bound proves the day cannot fit, so the system stops honestly without spending model calls |
-| 2:45–3:00 | — | Both | Crusoe and Nemotron actually used; what was built today; simulator limits |
+| 0:00–0:10 | Title card | You | "An agent team that runs a community solar cooking grid unattended, proves every plan before acting, and shares what it learns. Built today on Crusoe." |
+| 0:10–0:25 | 1 · One line becomes checks | You | "One line of goal; the Spec Agent wrote the checks; code tightened one and added one. It can never loosen them." |
+| 0:25–0:35 | 2 · The day ahead | Abel | "Households cook at home with different appliances, times and budgets; fixed station limits." |
+| 0:35–1:00 | 3 · Agents propose, code decides | You | "Nemotron proposes prices; code books and checks two forecasts; failures come back as reasons: re-plan, re-plan, continue." |
+| 1:00–1:20 | 4 · Only proven knowledge enters | You | "The Keeper rebuilds every fact from evidence; this fabricated note is rejected." |
+| 1:20–1:45 | 5 · A fresh agent starts where the last ended | You | Point at the bars: calls and tokens, no memory vs Shared Brain. "One example; the table is the evidence." |
+| 1:45–2:05 | 6 · Tomorrow on a real forecast | You | "You.com finds tomorrow's forecast, Nemotron extracts it, code checks the quote; the agents plan tomorrow on it." |
+| 2:05–2:20 | 7 · Knowing when to stop | Abel | "Impossible days are proven impossible before spending a call, and a human is pinged." |
+| 2:20–2:35 | 8 · Version N+1 | Abel | "A playbook change is kept only if it helps, then checked on unseen days." |
+| 2:35–3:00 | Closing card + results table | Both | Track by track, what was shown; Crusoe calls and cost; NemoClaw kit status; the held-out table. |
 
-Single scenes also work: `demo --scene world|proposal|memory|handoff|infeasible`
-(`memory` runs its own agent day when used alone).
+Single acts: `demo --scene goal|world|proposal|memory|handoff|tomorrow|infeasible|improve`.
+Shorter cut if time is tight: skip acts 2 and 8 (`--scene` one by one).
 
 ## Fallbacks
 
