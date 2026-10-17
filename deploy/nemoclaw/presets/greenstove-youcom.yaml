@@ -1,0 +1,21 @@
+# Custom NemoClaw policy preset: You.com Web Search for the weather forecast (gsa forecast --mode live).
+# Format: https://docs.nvidia.com/nemoclaw/latest/user-guide/deepagents/network-policy/configure-policies/create-custom-policy-presets.html
+# Our client: greenstove/forecast/youcom.py (POST https://ydc-index.io/v1/search, header X-API-Key).
+# Apply:  nemo-deepagents <sandbox> policy add --from-file deploy/nemoclaw/presets/greenstove-youcom.yaml --yes
+# UNVERIFIED on a real sandbox: the binary paths (confirm with `openshell term`).
+preset:
+  name: greenstove-youcom
+  description: "You.com search API for Green-Stove forecasts (search only)"
+network_policies:
+  greenstove-youcom:
+    name: greenstove-youcom
+    endpoints:
+      - host: ydc-index.io
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: POST, path: "/v1/search" }
+    binaries:
+      - { path: /sandbox/**/bin/python3* }
+      - { path: /opt/venv/bin/python3* }

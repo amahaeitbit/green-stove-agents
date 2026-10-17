@@ -1,0 +1,25 @@
+# NOT a NemoClaw/OpenShell file. It records which mechanism enforces each Green-Stove boundary,
+# because the filesystem part cannot be expressed in the documented policy schema for our layout:
+# the Deep Agents baseline makes all of /sandbox read-write, and Landlock rules only ADD access,
+# so a policy cannot make a subfolder of /sandbox read-only. A read-only host mount can.
+# Sources:
+#   baseline policy  https://raw.githubusercontent.com/NVIDIA/NemoClaw/main/agents/langchain-deepagents-code/policy-additions.yaml
+#   static vs hot    https://docs.nvidia.com/openshell/latest/how-it-works/policies/overview
+#   host mount       https://docs.nvidia.com/nemoclaw/latest/user-guide/deepagents/reference/commands.html (onboard --host-mount)
+boundaries:
+  - intent: egress only to Crusoe inference, You.com search and GitHub
+    mechanism: network_policies (hot-reloadable)
+    files: [presets/greenstove-crusoe.yaml, presets/greenstove-youcom.yaml, policy-runtime.yaml]
+    verified_from_docs: schema yes; applied on a sandbox no
+  - intent: deny every other host (demo probe https://example.com)
+    mechanism: OpenShell default deny for hosts without a network policy entry
+    verified_from_docs: yes (deny by default); observed no
+  - intent: read-only code, config (greenstove/, pyproject.toml, .env), evaluation fixtures (fixtures/), frozen brain (frozen/)
+    mechanism: repo mounted read-only at /sandbox/green-stove-agents via `onboard --host-mount` (Docker on Linux/WSL2)
+    verified_from_docs: flag yes (read-only live mount); observed no
+  - intent: writable run data (evidence, brain workspace, events, alerts, usage)
+    mechanism: GREENSTOVE_DATA_DIR=/sandbox/gsa-data (inside the read_write /sandbox tree)
+    verified_from_docs: /sandbox is read_write in the baseline; observed no
+  - intent: approved memory only through the Keeper
+    mechanism: application code (greenstove/brain/keeper.py), unchanged; the sandbox complements it
+    verified_from_docs: not applicable

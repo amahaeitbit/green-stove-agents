@@ -1,0 +1,110 @@
+# Green-Stove runtime policy for an OpenShell sandbox created by NemoClaw (LangChain Deep Agents agent).
+#
+# WHAT THIS IS: the full policy we want while `gsa runner --watch` runs. Same schema as the
+# documented Deep Agents baseline (version 1, filesystem_policy, landlock, process, network_policies):
+#   https://raw.githubusercontent.com/NVIDIA/NemoClaw/main/agents/langchain-deepagents-code/policy-additions.yaml
+# Network egress allowed: inference.local (OpenShell inference route), api.inference.crusoecloud.com,
+# ydc-index.io, github.com. Everything else, including example.com and PyPI, is denied.
+#
+# HOW TO APPLY (after setup has installed Python packages, because this removes PyPI):
+#   nemo-deepagents <sandbox> policy get > current-policy.yaml          # keep as a backup
+#   openshell policy set --policy deploy/nemoclaw/policy-runtime.yaml --wait <sandbox>
+# Source for both commands:
+#   https://docs.nvidia.com/nemoclaw/latest/user-guide/deepagents/network-policy/configure-policies/create-custom-policy-presets.html
+#   https://docs.nvidia.com/openshell/latest/how-it-works/policies/overview  (network_policies are hot-reloadable)
+#
+# IMPORTANT: filesystem_policy, landlock and process are STATIC: OpenShell fixes them when the sandbox
+# is created, so they are copied here unchanged from the documented baseline. A different value here
+# does not change a running sandbox, and it may be rejected. The read-only protection of our code,
+# config, fixtures and frozen brain therefore comes from the read-only host mount used at onboarding
+# (`--host-mount <repo>:/sandbox/green-stove-agents`, see README.md), not from this file.
+#
+# UNVERIFIED (this was written on a Mac that cannot run NemoClaw): that `policy set` accepts this file
+# as is, and the binary paths of our venv's Python. If `policy get` shows different filesystem values on
+# your sandbox, copy those over the filesystem_policy block below before applying.
+version: 1
+
+filesystem_policy:
+  include_workdir: true
+  read_only:
+    - /usr
+    - /opt/venv
+    - /lib
+    - /proc
+    - /dev/urandom
+    - /app
+    - /etc
+    - /var/log
+    - /var/lib/dpkg
+  read_write:
+    - /sandbox
+    - /sandbox/.deepagents
+    - /run/nemoclaw-dcode-mcp
+    - /tmp
+    - /dev/null
+
+landlock:
+  compatibility: strict
+
+process:
+  run_as_user: sandbox
+  run_as_group: sandbox
+
+network_policies:
+  # OpenShell inference route (option B in README.md): the gateway forwards to the provider chosen at
+  # onboarding (custom -> Crusoe) so the real key can stay outside the sandbox.
+  managed_inference:
+    name: managed_inference
+    endpoints:
+      - host: inference.local
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: POST, path: "/v1/chat/completions" }
+          - allow: { method: GET, path: "/v1/models" }
+          - allow: { method: GET, path: "/v1/models/**" }
+    binaries:
+      - { path: /usr/local/bin/dcode }
+      - { path: /opt/venv/bin/python3* }
+      - { path: /sandbox/**/bin/python3* }
+
+  # Direct Crusoe calls (option A in README.md): our LLM client posts to CRUSOE_BASE_URL.
+  greenstove-crusoe:
+    name: greenstove-crusoe
+    endpoints:
+      - host: api.inference.crusoecloud.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: POST, path: "/v1/chat/completions" }
+          - allow: { method: GET, path: "/v1/models" }
+          - allow: { method: GET, path: "/v1/models/**" }
+    binaries:
+      - { path: /sandbox/**/bin/python3* }
+      - { path: /opt/venv/bin/python3* }
+
+  # You.com search for the weather forecast (greenstove/forecast/youcom.py).
+  greenstove-youcom:
+    name: greenstove-youcom
+    endpoints:
+      - host: ydc-index.io
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: POST, path: "/v1/search" }
+    binaries:
+      - { path: /sandbox/**/bin/python3* }
+      - { path: /opt/venv/bin/python3* }
+
+  # GitHub for git pull of the repo (only github.com; no API, no raw content).
+  github:
+    name: github
+    endpoints:
+      - host: github.com
+        port: 443
+        access: full
+    binaries:
+      - { path: /usr/bin/git }
