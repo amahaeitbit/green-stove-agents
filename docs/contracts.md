@@ -184,6 +184,15 @@ honor coverage.complete before advertising verified grid service.
 
 ## Battery-backed start admission
 
+Environment-side independent verification is now available in `admission_verifier.py`,
+with the supervisor-compatible bridge in `admission_world.py`. See
+[the integration handoff](environment-integration-ready.md) for the partner-owned loader
+and memory fingerprint hooks. This does not automatically replace the legacy adapter's
+verifier. Actual verification takes evaluator-supplied ActualScenario separately; a
+trace's own PV array is not authoritative. Configuration identity includes BatterySpec,
+policy/simulator/verifier versions and effective requirements. Regenerate old development
+memory after adopting this identity. No C0 schema or version changes are implied.
+
 The team agreed to delay starts instead of interrupting cooking under the fixed simulation
 model. [admission-policy.md](admission-policy.md) defines the environment-side implementation.
 The local supervisor must distinguish a booked reservation from an admitted session.
