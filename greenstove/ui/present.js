@@ -45,6 +45,19 @@ function headerEl(){return q('header.top');}
 function readPref(){try{return window.localStorage.getItem(STORE_KEY)!=='0';}catch(e){return true;}}
 function writePref(on){try{window.localStorage.setItem(STORE_KEY,on?'1':'0');}catch(e){}}
 function isPresenter(){try{return document.body.classList.contains('presenter');}catch(e){return false;}}
+/* tile values must never clip: shrink the font until the value fits its tile (six tiles share one row on laptops) */
+function fitTiles(){
+  try{
+    if(!heroTiles)return;
+    var vs=heroTiles.querySelectorAll('.v');
+    for(var i=0;i<vs.length;i++){
+      var v=vs[i];v.style.fontSize='';
+      var size=parseFloat(window.getComputedStyle(v).fontSize)||24,guard=0;
+      while(v.scrollWidth>v.clientWidth+1&&size>13&&guard++<24){size-=1;v.style.fontSize=size+'px';}
+    }
+  }catch(e){}
+}
+function fitTilesSoon(){try{(window.requestAnimationFrame||setTimeout)(fitTiles);}catch(e){}}
 function setPresenter(on,save){
   try{
     document.body.classList.toggle('presenter',!!on);
@@ -54,6 +67,7 @@ function setPresenter(on,save){
     }
     if(save)writePref(!!on);
     scheduleViewCheck();                         /* the header changes height with the mode */
+    fitTilesSoon();
   }catch(e){}
 }
 function togglePresenter(){setPresenter(!isPresenter(),true);}
@@ -130,6 +144,7 @@ function renderHero(){
     heroTrail.hidden=!heroTrail.textContent;
     heroFoot.hidden=heroTrail.hidden&&heroNote.hidden;
     renderMini();
+    fitTilesSoon();
   }catch(e){}
 }
 function buildHero(){
@@ -232,7 +247,7 @@ function watchHero(){
 function onResize(){
   try{
     if(resizeTimer)clearTimeout(resizeTimer);
-    resizeTimer=setTimeout(function(){resizeTimer=0;scheduleViewCheck();},120);
+    resizeTimer=setTimeout(function(){resizeTimer=0;scheduleViewCheck();fitTiles();},120);
   }catch(e){}
 }
 
