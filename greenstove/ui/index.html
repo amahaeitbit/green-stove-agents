@@ -71,6 +71,31 @@ header.top{background:var(--panel);border-bottom:1px solid var(--line);position:
 .hint{font-size:11.5px;color:var(--muted);font-weight:400;max-width:260px}
 .banner{max-width:1600px;margin:0 auto;padding:7px 16px;font-size:13px;background:var(--warn-bg);color:var(--warn);border-top:1px solid var(--line)}
 .banner[hidden]{display:none}
+/* #top-slot: present.js mounts its status pill and the Presenter toggle here */
+#top-slot{display:flex;gap:8px;align-items:center;flex-wrap:wrap;min-width:0}
+#top-slot:not(:empty){padding:0 16px 8px}
+@media (min-width:761px){
+  /* the slot shares the bar's row; the banner (order 1 → placed last) takes its own full-width row */
+  header.top{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center}
+  #banner{grid-column:1/-1;order:1}
+  #top-slot{grid-column:2;flex-wrap:nowrap}
+  #top-slot:not(:empty){padding:0 16px 0 0}
+}
+@media (min-width:1100px){
+  /* one compact row: title + badges left, Scenario/Memory/Run/Reset right */
+  body header.top .top-inner{padding:6px 16px;flex-wrap:nowrap;gap:8px 14px}
+  .brand{flex:1 1 0;flex-wrap:nowrap;overflow:hidden}
+  .brand h1{font-size:16px;white-space:nowrap;flex:0 0 auto}
+  .brand .badge{flex:0 1 auto;min-width:0}
+  #badge-model{flex-shrink:3;max-width:260px}
+  #badge-session{flex-shrink:2}
+  .controls{flex:0 0 auto;flex-wrap:nowrap;align-items:center;gap:8px}
+  .controls label.field{flex-direction:row;align-items:center;gap:6px}
+  .controls .lbl,.controls .hint{position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  header.top .top-inner .controls>.btn,header.top .top-inner .controls>#btn-run{margin-top:0}
+  .controls #sel-scenario{width:min(250px,19vw)}
+  .controls #sel-memory{width:min(185px,14vw)}
+}
 /* tabs + panels */
 nav.tabs{display:none}
 main{max-width:1600px;margin:0 auto;padding:16px;display:grid;gap:16px;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr) minmax(0,1fr)}
@@ -79,6 +104,12 @@ main{max-width:1600px;margin:0 auto;padding:16px;display:grid;gap:16px;grid-temp
 .panel-head .sub{font-size:12.5px;color:var(--muted)}
 #panel-tools{grid-column:1/-1}
 .tools-grid{display:grid;gap:14px;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr)}
+@media (min-width:761px){
+  /* desktop: each column fits the viewport under the sticky bar (--top-h is measured by script), so Sponsor tools
+     sits about one screen down; the panel heading stays visible while the column scrolls */
+  #panel-households,#panel-agent,#panel-brain{max-height:calc(100vh - var(--top-h,64px) - 32px);overflow:auto;padding-top:0;overscroll-behavior:contain}
+  #panel-households>.panel-head,#panel-agent>.panel-head,#panel-brain>.panel-head{position:sticky;top:0;z-index:3;background:var(--panel);padding:14px 0 8px;margin:0 0 6px}
+}
 @media (max-width:1279px){
   main{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
   #panel-brain{grid-column:1/-1}
@@ -111,12 +142,26 @@ table{border-collapse:collapse;width:100%;font-size:13px}
 th,td{text-align:left;padding:6px 9px;border-bottom:1px solid var(--line);vertical-align:top}
 th{background:var(--mut-bg);font-weight:650;white-space:nowrap;font-size:12px}
 tr:last-child td{border-bottom:0}
+td{white-space:normal;overflow-wrap:anywhere}          /* long text cells wrap instead of pushing the table out of view */
 td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
-td.wrap{min-width:180px;overflow-wrap:anywhere}
+td.wrap{min-width:140px;overflow-wrap:anywhere}
+.tw .chip{white-space:normal;overflow-wrap:anywhere;text-align:left}
 tr.chosen td{background:var(--ok-bg)}
 /* households */
 .scenario-sum{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}
-.hh-list{display:flex;flex-direction:column;gap:10px}
+.hh-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0 6px}
+.hh-tools[hidden]{display:none}
+.hh-list{display:flex;flex-direction:column;gap:8px}
+.hh-sum{display:flex;align-items:center;gap:6px;min-width:0}
+.hh-toggle{flex:1 1 auto;min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;border:0;background:none;padding:2px 0;text-align:left;cursor:pointer;color:var(--ink);font:inherit;border-radius:8px}
+.hh-toggle:hover .hh-id{text-decoration:underline}
+.hh-toggle .chev{display:inline-block;width:14px;color:var(--muted);font-size:12px;transition:transform .15s}
+.hh-toggle[aria-expanded=true] .chev{transform:rotate(90deg)}
+.hh-id{font-weight:700;font-size:14.5px}
+.hh-fact{font-size:12.5px;color:var(--muted);white-space:nowrap}
+.hh-said{flex:1 1 140px;min-width:0;font-size:12.5px;color:var(--muted);font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hh-body{margin-top:8px;min-width:0}
+.hh-body[hidden]{display:none}
 .hh-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
 .facts{display:flex;flex-wrap:wrap;gap:4px 14px;margin:6px 0;font-size:12.5px;color:var(--muted)}
 .facts b{color:var(--ink);font-weight:650}
@@ -158,9 +203,12 @@ tr.chosen td{background:var(--ok-bg)}
 details{margin:6px 0}
 summary{cursor:pointer;font-weight:650;font-size:13px}
 /* brain */
-.entries{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:440px;overflow:auto}
-.entry{width:100%;text-align:left;border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:8px 10px;cursor:pointer;display:flex;flex-direction:column;gap:3px}
+.entries{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:min(440px,50vh);overflow:auto}
+.entries>li{min-width:0;max-width:100%}
+.entry{width:100%;max-width:100%;min-width:0;text-align:left;border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:8px 10px;cursor:pointer;display:flex;flex-direction:column;gap:3px}
 .entry:hover{border-color:var(--muted)}
+.entry>div{min-width:0;overflow-wrap:anywhere}
+.entry .chip{white-space:normal;overflow-wrap:anywhere;text-align:left}
 .entry .sit{font-size:13px;overflow-wrap:anywhere}
 .note-form{display:flex;flex-direction:column;gap:8px}
 .note-form select[multiple]{min-height:130px;width:100%}
@@ -197,10 +245,10 @@ dialog.drawer::backdrop{background:rgba(10,14,20,.45)}
       <span id="badge-session" class="badge" aria-label="Session">session …</span>
     </div>
     <div class="controls">
-      <label class="field">Scenario
+      <label class="field"><span class="lbl">Scenario</span>
         <select id="sel-scenario" aria-label="Scenario"><option>Loading…</option></select>
       </label>
-      <label class="field">Memory mode
+      <label class="field"><span class="lbl">Memory mode</span>
         <select id="sel-memory" aria-label="Memory mode" aria-describedby="memory-hint"></select>
         <span id="memory-hint" class="hint"></span>
       </label>
@@ -209,6 +257,7 @@ dialog.drawer::backdrop{background:rgba(10,14,20,.45)}
     </div>
   </div>
   <div id="banner" class="banner" role="note" hidden></div>
+  <div id="top-slot"></div>
 </header>
 
 <nav class="tabs" role="tablist" aria-label="Panels">
@@ -223,6 +272,8 @@ dialog.drawer::backdrop{background:rgba(10,14,20,.45)}
     <div class="panel-head"><h2>Households</h2><span class="sub">each household has its own agent</span></div>
     <div id="scenario-sum" class="scenario-sum"></div>
     <div id="station"></div>
+    <div id="hh-tools" class="hh-tools" hidden><span id="hh-count" class="small muted"></span><span class="grow"></span>
+      <button id="btn-hh-expand" class="btn sm ghost" type="button" aria-controls="hh-list">Expand all</button></div>
     <div id="hh-list" class="hh-list"><div class="loading">Loading scenario…</div></div>
   </section>
 
@@ -314,7 +365,9 @@ dialog.drawer::backdrop{background:rgba(10,14,20,.45)}
 (function(){
 'use strict';
 const $=(s,r)=>(r||document).querySelector(s);
-const S={state:null,scenarioName:null,scenario:null,run:null,runScenario:null,runMemory:null,brain:null,evidence:[],asks:{},editing:{},tools:null,forecast:null};
+/* S.seq is bumped on every scenario change and reset; each async handler captures it before awaiting and drops a
+   reply that arrives after a bump, so a slow response can never overwrite newer state. S.open: expanded cards. */
+const S={seq:0,state:null,scenarioName:null,scenario:null,run:null,runScenario:null,runMemory:null,brain:null,evidence:[],asks:{},editing:{},open:{},tools:null,forecast:null};
 const MEMORY_HINTS={off:'No memory: the agent starts cold every run.',history:'Raw history: earlier runs are pasted in, unchecked.',curated:'Shared Brain: only Keeper-admitted, evidence-backed entries.'};
 
 /* ---------- DOM helpers (all data goes through textContent) ---------- */
@@ -341,7 +394,7 @@ function fmtAny(v){
   if(typeof v==='number')return fmtNum(v);
   if(typeof v==='boolean')return v?'yes':'no';
   if(Array.isArray(v))return v.length?v.map(fmtAny).join(', '):'—';
-  if(typeof v==='object')return Object.keys(v).map(k=>k+': '+fmtAny(v[k])).join(' · ');
+  if(typeof v==='object'){const ks=Object.keys(v);return ks.length?ks.map(k=>k+': '+fmtAny(v[k])).join(' · '):'—';}
   return String(v);
 }
 function money(v){return typeof v==='number'?v.toFixed(2):fmtAny(v);}   /* scenario currency units, not USD */
@@ -457,8 +510,14 @@ function renderTop(){
   fill(ms,modes.map(m=>el('option',{value:m,text:m+(MEMORY_HINTS[m]?' — '+MEMORY_HINTS[m].split(':')[0].toLowerCase():'')})));
   ms.value=modes.indexOf(prev)>=0?prev:modes[modes.length-1];
   $('#memory-hint').textContent=MEMORY_HINTS[ms.value]||'';
+  ms.title=MEMORY_HINTS[ms.value]||'';                       /* the hint is visually hidden in the one-row bar */
+  sel.title=sel.selectedOptions[0]?sel.selectedOptions[0].text:'';
 }
-async function refreshState(){try{S.state=await api('/api/state');renderTop();renderBrainStats();}catch(e){toast('Could not refresh state: '+e.message);}}
+async function refreshState(){
+  const seq=S.seq;
+  try{const st=await api('/api/state');if(seq!==S.seq)return;S.state=st;renderTop();renderBrainStats();}
+  catch(e){if(seq!==S.seq)return;toast('Could not refresh state: '+e.message);}
+}
 
 /* ---------- households ---------- */
 function runFor(id,key){
@@ -505,20 +564,50 @@ function pvSpark(pv){
     svg.append(pl);});
   return el('div',{},svg,el('div',{class:'legend'},el('span',{},el('i',{style:'background:var(--c2)'}),'PV expected'),el('span',{},el('i',{style:'background:var(--c4)'}),'PV downside')));
 }
-function renderHouseholds(){
-  const list=$('#hh-list');
-  if(!S.scenario){fill(list,placeholder('Pick a scenario to load its households.'));return;}
+/* Cards are collapsed to a one-line summary by default. A card is open while it is being edited, was just asked,
+   or the user expanded it. Re-renders keep keyboard focus: every focusable control carries data-fk and
+   renderHouseholds() focuses the control with the same key (or an explicit one) after rebuilding the list. */
+function firstLine(t){const s=fmtAny(t).split(/\r?\n/)[0].trim();return s.length>160?s.slice(0,157)+'…':s;}
+function isOpen(id){return !!(S.open[id]||S.editing[id]);}
+function cardFor(id){return Array.from(document.querySelectorAll('#hh-list article[data-hh]')).find(a=>a.dataset.hh===String(id))||null;}
+function setOpen(id,on){
+  S.open[id]=!!on;
+  if(!on&&S.editing[id]){S.editing[id]=false;renderHouseholds('toggle:'+id);return;}   /* collapsing also closes the editor */
+  const card=cardFor(id);
+  if(card){const tog=card.querySelector('.hh-toggle'),body=card.querySelector('.hh-body');
+    if(tog)tog.setAttribute('aria-expanded',on?'true':'false');if(body)body.hidden=!on;}
+  renderHhTools();
+}
+function renderHhTools(){
+  const hs=asList(S.scenario&&S.scenario.households);const box=$('#hh-tools');
+  box.hidden=!hs.length;if(!hs.length)return;
+  const open=hs.filter(h=>isOpen(h.household_id)).length;
+  $('#hh-count').textContent=hs.length+' household'+(hs.length===1?'':'s')+' · '+open+' expanded';
+  $('#btn-hh-expand').textContent=open===hs.length?'Collapse all':'Expand all';
+}
+function toggleAll(){
+  const hs=asList(S.scenario&&S.scenario.households);if(!hs.length)return;
+  const all=hs.every(h=>isOpen(h.household_id));
+  hs.forEach(h=>setOpen(h.household_id,!all));
+}
+function renderHouseholds(focusKey){
+  const list=$('#hh-list');const act=document.activeElement;
+  const key=typeof focusKey==='string'?focusKey:(act&&act!==document.body&&list.contains(act)&&act.dataset&&act.dataset.fk)||null;
+  if(!S.scenario){fill(list,placeholder('Pick a scenario to load its households.'));renderHhTools();return;}
   const hs=asList(S.scenario.households);
-  if(!hs.length){fill(list,placeholder('This scenario has no households.'));return;}
+  if(!hs.length){fill(list,placeholder('This scenario has no households.'));renderHhTools();return;}
   fill(list,hs.map(householdCard),
     el('div',{class:'legend'},el('span',{},el('i',{style:'background:var(--info-bg);border:1px solid var(--info)'}),'allowed window'),
       el('span',{},el('i',{style:'background:var(--c1)'}),'preferred slot'),el('span',{},el('i',{style:'background:var(--c3)'}),'booked by run')));
+  renderHhTools();
+  if(key){const n=Array.from(list.querySelectorAll('[data-fk]')).find(x=>x.dataset.fk===key);if(n)n.focus({preventScroll:true});}
 }
 function householdCard(h){
   const id=h.household_id;
   const msg=runFor(id,'messages');const bk=runFor(id,'bookings');const ask=S.asks[id];
   const pref=toMin(h.preferred);const mins=Number(h.minutes)||0;
-  const sw=el('button',{class:'switch',type:'button',role:'switch','aria-checked':h.auto_book?'true':'false','aria-label':'Auto-book for '+id},
+  const open=isOpen(id);
+  const sw=el('button',{class:'switch',type:'button',role:'switch','aria-checked':h.auto_book?'true':'false','aria-label':'Auto-book for '+id,'data-fk':'auto:'+id},
     el('span',{class:'track','aria-hidden':'true'}),el('span',{text:'auto-book'}));
   sw.addEventListener('click',()=>withBusy(null,null,()=>saveHousehold(id,{auto_book:!h.auto_book})));
   const bar=el('div',{class:'bar',role:'img','aria-label':'Window '+showTime(h.earliest)+' to '+showTime(h.latest_finish)+', preferred '+showTime(h.preferred)+(bk?', booked '+showTime(bk.start)+' to '+showTime(bk.end):'')},
@@ -533,19 +622,27 @@ function householdCard(h){
   const sPref=timeSelect(fid+'-pref',h.preferred),sE=timeSelect(fid+'-ear',h.earliest),sL=timeSelect(fid+'-lat',h.latest_finish);
   add(edit,[el('label',{class:'field'},'Preferred',sPref),el('label',{class:'field'},'Earliest',sE),el('label',{class:'field'},'Latest finish',sL),
     el('label',{class:'field'},'Budget',cost),el('label',{class:'field',style:'justify-content:flex-end'},el('span',{},ab,' auto-book')),
-    el('div',{class:'row-actions'},el('button',{class:'btn sm primary',type:'submit',text:'Save'}),
-      el('button',{class:'btn sm ghost',type:'button',text:'Cancel',onclick:()=>{S.editing[id]=false;renderHouseholds();}}))]);
+    el('div',{class:'row-actions'},el('button',{class:'btn sm primary',type:'submit',text:'Save','data-fk':'save:'+id}),
+      el('button',{class:'btn sm ghost',type:'button',text:'Cancel','data-fk':'cancel:'+id,onclick:()=>{S.editing[id]=false;renderHouseholds('edit:'+id);}}))]);
   edit.addEventListener('submit',ev=>{ev.preventDefault();const b=edit.querySelector('button[type=submit]');
     const ch={preferred:sPref.value,earliest:sE.value,latest_finish:sL.value,auto_book:ab.checked};
     if(cost.value!=='')ch.max_cost=Number(cost.value);
-    withBusy(b,'Saving…',async()=>{await saveHousehold(id,ch);S.editing[id]=false;renderHouseholds();});});
-  const editBtn=el('button',{class:'btn sm',type:'button','aria-expanded':editOpen?'true':'false','aria-controls':fid,text:editOpen?'Close edit':'Edit'});
+    withBusy(b,'Saving…',()=>saveHousehold(id,ch,true));});
+  const editBtn=el('button',{class:'btn sm',type:'button','aria-expanded':editOpen?'true':'false','aria-controls':fid,text:editOpen?'Close edit':'Edit','data-fk':'edit:'+id});
   edit.id=fid;
-  editBtn.addEventListener('click',()=>{S.editing[id]=!S.editing[id];renderHouseholds();});
-  const askBtn=el('button',{class:'btn sm',type:'button',text:'Ask household agent','aria-label':'Ask the household agent for '+id});
-  askBtn.addEventListener('click',()=>withBusy(askBtn,'Asking…',()=>askHousehold(id)));
-  return el('article',{class:'card','aria-label':'Household '+id},
-    el('div',{class:'hh-head'},el('h3',{text:id}),h.request_id?el('span',{class:'small muted',text:'request '+h.request_id}):null,el('span',{class:'grow'}),sw),
+  editBtn.addEventListener('click',()=>{S.editing[id]=!S.editing[id];S.open[id]=true;renderHouseholds('edit:'+id);});
+  const askBtn=el('button',{class:'btn sm',type:'button',text:'Ask household agent','aria-label':'Ask the household agent for '+id,'data-fk':'ask:'+id});
+  askBtn.addEventListener('click',()=>{setOpen(id,true);withBusy(askBtn,'Asking…',()=>askHousehold(id));});
+  const status=msg?String(msg.status||'').toUpperCase().replace(/_/g,' '):null;
+  const tog=el('button',{class:'hh-toggle',type:'button','aria-expanded':open?'true':'false','aria-controls':fid+'-body','data-fk':'toggle:'+id},
+    el('span',{class:'chev','aria-hidden':'true',text:'▸'}),el('span',{class:'hh-id',text:id}),
+    el('span',{class:'hh-fact',text:fmtAny(h.power_kw)+' kW'}),el('span',{class:'hh-fact',text:'prefers '+showTime(h.preferred)}),
+    bk?chip('booked '+showTime(bk.start)+'–'+showTime(bk.end),statusKind(bk.status)):null,
+    msg?chip(status,statusKind(msg.status),fmtAny(msg.text)):null,
+    ask?el('span',{class:'hh-said',text:'“'+firstLine(ask.message)+'”',title:fmtAny(ask.message)}):null);
+  tog.addEventListener('click',()=>setOpen(id,!isOpen(id)));
+  const body=el('div',{class:'hh-body',id:fid+'-body',hidden:!open},
+    el('div',{class:'hh-head'},h.request_id?el('span',{class:'small muted',text:'request '+h.request_id}):null,el('span',{class:'grow'}),sw),
     el('div',{class:'facts'},
       el('span',{},el('b',{text:fmtAny(h.power_kw)}),' kW'),el('span',{},el('b',{text:fmtAny(h.minutes)}),' min'),
       el('span',{},'preferred ',el('b',{text:showTime(h.preferred)})),
@@ -553,11 +650,12 @@ function householdCard(h){
       el('span',{},'budget ',el('b',{text:money(h.max_cost)})),
       h.shift_penalty!=null?el('span',{},'shift penalty ',el('b',{text:fmtAny(h.shift_penalty)})):null),
     bar,ticks(),
-    el('div',{class:'actions'},askBtn,editBtn,bk?chip('booked '+showTime(bk.start)+'–'+showTime(bk.end)+' · '+money(bk.cost),statusKind(bk.status)):null),
+    el('div',{class:'actions'},editBtn,bk?chip('booked '+showTime(bk.start)+'–'+showTime(bk.end)+' · '+money(bk.cost),statusKind(bk.status)):null),
     edit,
     ask?askBubble(ask):null,
-    msg?el('div',{class:'bubble run'},el('div',{class:'who'},'after the run',chip(String(msg.status||'').toUpperCase().replace(/_/g,' '),statusKind(msg.status))),
+    msg?el('div',{class:'bubble run'},el('div',{class:'who'},'after the run',chip(status,statusKind(msg.status))),
       el('div',{text:fmtAny(msg.text)}),msg.reason?el('div',{class:'small muted',text:'reason: '+fmtAny(msg.reason)}):null):null);
+  return el('article',{class:'card','aria-label':'Household '+id,'data-hh':id},el('div',{class:'hh-sum'},tog,askBtn),body);
 }
 function askBubble(a){
   const opts=asList(a.options).slice(0,4);const ch=a.choice;
@@ -570,27 +668,36 @@ function askBubble(a){
       el('tbody',{},opts.map(o=>el('tr',{class:same(o)?'chosen':null},el('td',{text:showTime(o.start)+'–'+showTime(o.end)}),el('td',{class:'num',text:money(o.quote)}),
         el('td',{class:'num',text:fmtAny(o.shift_hours)}),el('td',{class:'num',text:fmtAny(o.score)}),el('td',{},o.within_budget?chip('within','ok'):chip('over','bad'))))))):null);
 }
-async function saveHousehold(id,changes){
+async function saveHousehold(id,changes,closeEdit){
+  const seq=S.seq;
   const body=Object.assign({scenario:S.scenarioName,household_id:id},changes);
   const upd=await api('/api/household/update',body);
+  if(seq!==S.seq)return;                                     /* scenario changed or session reset meanwhile */
   const hs=asList(S.scenario&&S.scenario.households);const i=hs.findIndex(x=>x.household_id===id);
   if(i>=0)hs[i]=upd&&upd.household_id?upd:Object.assign({},hs[i],changes);
-  delete S.asks[id];renderHouseholds();toast('Saved '+id,'ok');
+  delete S.asks[id];if(closeEdit)S.editing[id]=false;
+  renderHouseholds(closeEdit?'edit:'+id:undefined);toast('Saved '+id,'ok');   /* Save returns focus to the Edit button */
 }
 async function askHousehold(id){
+  const seq=S.seq;
   const body={scenario:S.scenarioName,household_id:id};
   const atts=S.run&&S.runScenario===S.scenarioName&&S.run.run?asList(S.run.run.attempts):[];
   const last=atts.length?atts[atts.length-1]:null;
   let r;
   if(last&&last.prices!=null){try{r=await api('/api/household/ask',Object.assign({prices:last.prices},body));}catch(e){r=null;}}
-  if(!r)r=await api('/api/household/ask',body);
-  S.asks[id]=r;renderHouseholds();
+  if(!r){if(seq!==S.seq)return;r=await api('/api/household/ask',body);}
+  if(seq!==S.seq)return;
+  S.asks[id]=r;S.open[id]=true;renderHouseholds();
 }
 async function loadScenario(name){
   if(!name)return;
+  const seq=++S.seq;                                         /* replies still in flight for the old scenario are dropped */
   S.scenarioName=name;fill($('#hh-list'),loading('Loading '+name+'…'));
-  try{S.scenario=await api('/api/scenario',{name:name});S.asks={};S.editing={};}
-  catch(e){S.scenario=null;toast('Could not load scenario: '+e.message);}
+  let sc=null,err=null;
+  try{sc=await api('/api/scenario',{name:name});}catch(e){err=e;}
+  if(seq!==S.seq)return;                                     /* a newer scenario or a reset superseded this load */
+  S.scenario=err?null:sc;S.asks={};S.editing={};S.open={};
+  if(err)toast('Could not load scenario: '+err.message);
   renderScenarioSummary();renderHouseholds();
 }
 
@@ -644,17 +751,22 @@ function citeChip(id){
 }
 async function runAgent(){
   if(!S.scenarioName){toast('Pick a scenario first.');return;}
-  const btn=$('#btn-run');const mem=$('#sel-memory').value;
+  const btn=$('#btn-run');const mem=$('#sel-memory').value;const seq=S.seq;
   const body={scenario:S.scenarioName,memory_mode:mem};
   if($('#use-forecast').checked)body.use_forecast=true;
   fill($('#agent-body'),loading('Running the Green-Stove agent on '+S.scenarioName+' with memory '+mem+'…'));
   if(isPhone())selectTab('agent');
   await withBusy(btn,'Running…',async()=>{
-    try{const r=await api('/api/run',body);S.run=r;S.runScenario=body.scenario;S.runMemory=mem;}   /* not the select's current value */
-    finally{renderAgent();}
-    renderHouseholds();renderKeeperRun();
-    toast('Run finished: '+String((S.run.run||{}).status||'done'),statusKind((S.run.run||{}).status)==='bad'?'info':'ok');
-    await Promise.all([refreshBrain(),refreshState(),refreshTools(true)]);
+    let r;
+    try{r=await api('/api/run',body);}
+    catch(e){renderAgent();throw e;}                         /* the panel shows the previous run again; withBusy toasts */
+    if(seq!==S.seq){renderAgent();toast('The run on '+body.scenario+' finished after a scenario change or reset; its result was not applied.','info');}
+    else{
+      S.run=r;S.runScenario=body.scenario;S.runMemory=mem;   /* not the select's current value */
+      renderAgent();renderHouseholds();renderKeeperRun();
+      toast('Run finished: '+String((r.run||{}).status||'done'),statusKind((r.run||{}).status)==='bad'?'info':'ok');
+    }
+    await Promise.all([refreshBrain(),refreshState(),refreshTools(true)]);   /* the server did run: its brain and usage changed */
   });
 }
 
@@ -697,19 +809,26 @@ function renderEvidence(){
   if(!ev.length){sel.append(el('option',{disabled:true,text:'No evidence yet: run the agent first.'}));return;}
   const groups={};ev.forEach(r=>{const g=r.agent_run_id||r.run_id||'run';(groups[g]=groups[g]||[]).push(r);});
   Object.keys(groups).forEach(g=>{const og=el('optgroup',{label:'run '+g});
-    groups[g].forEach(r=>{const o=el('option',{value:r.run_id,text:fmtAny(r.scenario_id)+' · '+fmtAny(r.phase)+' · '+(r.passed?'PASS':'FAIL')+' · tariff '+fmtPrices(r.tariff)+' · served '+pct(r.served_fraction)+' · min batt '+fmtAny(r.min_battery_kwh)+' kWh'});
+    groups[g].forEach(r=>{
+      /* a <select> cannot wrap: drop the scenario prefix when it is the current scenario; the full text is the title */
+      const rest=fmtAny(r.phase)+' · '+(r.passed?'PASS':'FAIL')+' · tariff '+fmtPrices(r.tariff)+' · served '+pct(r.served_fraction)+' · min batt '+fmtAny(r.min_battery_kwh)+' kWh';
+      const full=fmtAny(r.scenario_id)+' · '+rest;
+      const o=el('option',{value:r.run_id,text:S.scenarioName&&r.scenario_id===S.scenarioName?rest:full,title:full});
       if(keep.has(String(r.run_id)))o.selected=true;og.append(o);});sel.append(og);});
 }
 async function refreshBrain(){
-  try{const [b,ev]=await Promise.all([api('/api/brain'),api('/api/evidence')]);S.brain=b;S.evidence=Array.isArray(ev)?ev:asList(ev&&ev.evidence);}
-  catch(e){toast('Could not load the Shared Brain: '+e.message);}
+  const seq=S.seq;
+  try{const [b,ev]=await Promise.all([api('/api/brain'),api('/api/evidence')]);if(seq!==S.seq)return;S.brain=b;S.evidence=Array.isArray(ev)?ev:asList(ev&&ev.evidence);}
+  catch(e){if(seq!==S.seq)return;toast('Could not load the Shared Brain: '+e.message);}
   renderBrainStats();renderEntries();renderEvidence();
 }
 async function openExplain(id){
   const dlg=$('#drawer');const body=$('#drawer-body');$('#drawer-title').textContent='Entry '+id;
   fill(body,loading('Loading explain view…'));
   if(!dlg.open){if(dlg.showModal)dlg.showModal();else dlg.setAttribute('open','');}
+  const seq=S.seq;
   try{const x=await api('/api/brain/explain?id='+encodeURIComponent(id));
+    if(seq!==S.seq){fill(body,el('p',{class:'small muted',text:'The session changed while this loaded; close and pick the entry again.'}));return;}
     fill(body,el('h4',{text:'Entry'}),kv(x.entry),
       el('h4',{text:'Evidence'}),objTable(x.evidence),
       el('h4',{text:'Source runs'}),objTable(x.source_runs),
@@ -726,9 +845,10 @@ async function submitNote(ev){
   if(!desc){toast('Write a description first.');$('#note-desc').focus();return;}
   const body={evidence_ids:ids,description:desc.slice(0,300),tags:$('#note-tags').value.split(',').map(s=>s.trim()).filter(Boolean).slice(0,8)};
   const c=$('#note-claim').value;if(c)body.claimed_passed=c==='true';
-  const out=$('#note-verdict');
+  const out=$('#note-verdict');const seq=S.seq;
   await withBusy($('#btn-note'),'Asking the Keeper…',async()=>{
     const v=await api('/api/brain/note',body);
+    if(seq!==S.seq){toast('The Keeper answered after the session changed; the verdict was not shown.','info');return;}
     fill(out,el('div',{class:'small muted',text:'Keeper verdict'}),verdictCard(v));
     await refreshBrain();
   });
@@ -748,9 +868,14 @@ function fabricate(){
 /* ---------- sponsor tools ---------- */
 function yesNo(v){return v?chip('yes','ok'):chip('no','warn');}
 async function refreshTools(quiet){
-  try{S.tools=await api('/api/tools');}catch(e){S.tools=null;if(!quiet)toast('Could not load sponsor tools: '+e.message);}
+  const seq=S.seq;
+  let t=null,err=null;
+  try{t=await api('/api/tools');}catch(e){err=e;}
+  if(seq!==S.seq)return;
+  S.tools=t;if(err&&!quiet)toast('Could not load sponsor tools: '+err.message);
   renderTools();
-  try{renderRunnerStatus(await api('/api/runner/status'));}catch(e){fill($('#nemo-status'),el('p',{class:'muted small',text:'Runner status unavailable: '+e.message}));}
+  try{const rs=await api('/api/runner/status');if(seq!==S.seq)return;renderRunnerStatus(rs);}
+  catch(e){if(seq!==S.seq)return;fill($('#nemo-status'),el('p',{class:'muted small',text:'Runner status unavailable: '+e.message}));}
 }
 function renderTools(){
   const t=S.tools||{};const cr=t.crusoe||{};const yc=t.youcom||{};const nc=t.nemoclaw||{};
@@ -765,7 +890,7 @@ function renderTools(){
     el('h4',{text:'Usage this session'}),
     usage.length?el('div',{class:'tw'},el('table',{},
       el('thead',{},el('tr',{},['role','mode','model','calls','tokens in/out','cached','cache hit','p50 / p95 ms','cost'].map(x=>el('th',{scope:'col',text:x})))),
-      el('tbody',{},usage.map(u=>el('tr',{},el('td',{text:fmtAny(u.role)}),el('td',{text:fmtAny(u.mode)}),el('td',{class:'small',text:fmtAny(u.model)}),
+      el('tbody',{},usage.map(u=>el('tr',{},el('td',{text:fmtAny(u.role)}),el('td',{text:fmtAny(u.mode)}),el('td',{class:'small wrap',text:fmtAny(u.model)}),
         el('td',{class:'num',text:fmtAny(u.calls)}),el('td',{class:'num',text:fmtAny(u.prompt_tokens)+' / '+fmtAny(u.completion_tokens)}),
         el('td',{class:'num',text:fmtAny(u.cached_tokens)}),el('td',{class:'num',text:pct(u.cache_hit)}),
         el('td',{class:'num',text:fmtAny(u.p50_ms)+' / '+fmtAny(u.p95_ms)}),el('td',{class:'num',text:typeof u.cost_usd==='number'?'$'+u.cost_usd.toFixed(4):fmtAny(u.cost_usd)}))))))
@@ -777,9 +902,9 @@ function renderTools(){
   $('#nemo-kit').textContent=nc.kit?'Kit: '+fmtAny(nc.kit):'';
 }
 async function showModels(){
-  const box=$('#crusoe-models');
+  const box=$('#crusoe-models');const seq=S.seq;
   await withBusy($('#btn-models'),'Loading…',async()=>{
-    try{const m=await api('/api/crusoe/models');const list=Array.isArray(m)?m:asList(m&&m.models);
+    try{const m=await api('/api/crusoe/models');if(seq!==S.seq)return;const list=Array.isArray(m)?m:asList(m&&m.models);
       fill(box,el('h4',{text:'Live model catalog'}),list.length?el('div',{class:'tw'},el('table',{},
         el('thead',{},el('tr',{},['model','nemotron','modality','context','supported','$/Mtok in','$/Mtok out'].map(x=>el('th',{scope:'col',text:x})))),
         el('tbody',{},list.map(r=>el('tr',{},el('td',{class:'small',text:fmtAny(r.id)}),el('td',{},r.nemotron?chip('nemotron','ok'):el('span',{class:'muted',text:'—'})),
@@ -791,9 +916,11 @@ async function showModels(){
 async function fetchForecast(ev){
   ev.preventDefault();
   const body={place:$('#fc-place').value.trim(),lat:Number($('#fc-lat').value),lon:Number($('#fc-lon').value),date:$('#fc-date').value};
-  const out=$('#fc-result');
+  const out=$('#fc-result');const seq=S.seq;
   await withBusy($('#btn-forecast'),'Fetching…',async()=>{
-    const f=await api('/api/forecast',body);S.forecast=f;
+    const f=await api('/api/forecast',body);
+    if(seq!==S.seq){toast('The forecast arrived after the session changed; fetch it again if you still need it.','info');return;}
+    S.forecast=f;
     const st=String(f.status||'');const verified=/^verified/i.test(st);
     const mockChip=m=>chip(fmtAny(m).toUpperCase()==='MOCK'?'MOCK':fmtAny(m),/mock/i.test(String(m))?'warn':'info');
     fill(out,el('div',{class:'sub-card'},
@@ -809,27 +936,31 @@ async function fetchForecast(ev){
   });
 }
 async function runnerEvent(btn,body){
-  await withBusy(btn,'Sending…',async()=>{const r=await api('/api/runner/event',body);toast('Queued '+body.type+(r&&r.id?' ('+r.id+')':''),'ok');
-    try{renderRunnerStatus(await api('/api/runner/status'));}catch(e){}});
+  const seq=S.seq;
+  await withBusy(btn,'Sending…',async()=>{const r=await api('/api/runner/event',body);if(seq!==S.seq)return;
+    toast('Queued '+body.type+(r&&r.id?' ('+r.id+')':''),'ok');
+    try{const rs=await api('/api/runner/status');if(seq===S.seq)renderRunnerStatus(rs);}catch(e){}});
 }
 async function drain(){
+  const seq=S.seq;
   await withBusy($('#btn-drain'),'Processing…',async()=>{
-    const r=await api('/api/runner/drain',{});const h=asList(r&&r.handled);
+    const r=await api('/api/runner/drain',{});if(seq!==S.seq)return;const h=asList(r&&r.handled);
     fill($('#nemo-handled'),el('h4',{text:'Handled events'}),h.length?el('div',{class:'tw'},el('table',{},
       el('thead',{},el('tr',{},['id','type','outcome','model calls'].map(x=>el('th',{scope:'col',text:x})))),
       el('tbody',{},h.map(x=>el('tr',{},el('td',{class:'small',text:fmtAny(x.id)}),el('td',{text:fmtAny(x.type)}),el('td',{class:'wrap',text:fmtAny(x.outcome)}),el('td',{class:'num',text:fmtAny(x.calls==null?0:x.calls)})))))):el('p',{class:'muted small',text:'No queued events.'}));
-    try{renderRunnerStatus(await api('/api/runner/status'));}catch(e){}
+    try{const rs=await api('/api/runner/status');if(seq===S.seq)renderRunnerStatus(rs);}catch(e){}
     refreshTools(true);
   });
 }
 function renderRunnerStatus(s){
   const box=$('#nemo-status');
   if(!s||typeof s!=='object'){fill(box,null);return;}
+  /* per-day counters and day records are dicts; while empty they are shown as "—" in the summary, never as a blank row */
   const parts=[el('h4',{text:'Runner status'})];const simple={};
   for(const k of Object.keys(s)){const v=s[k];
-    if(Array.isArray(v)){parts.push(el('div',{class:'small muted',text:label(k)+' ('+v.length+')'}),objTable(v.slice(-8)));}
-    else if(v&&typeof v==='object'){parts.push(el('div',{class:'small muted',text:label(k)}),kv(v));}
-    else simple[k]=v;}
+    if(Array.isArray(v)){if(v.length)parts.push(el('div',{class:'small muted',text:label(k)+' ('+v.length+')'}),objTable(v.slice(-8)));else simple[k]='—';}
+    else if(v&&typeof v==='object'){if(Object.keys(v).length)parts.push(el('div',{class:'small muted',text:label(k)}),kv(v));else simple[k]='—';}
+    else simple[k]=v==null?'—':v;}
   if(Object.keys(simple).length)parts.splice(1,0,kv(simple));
   fill(box,parts);
 }
@@ -847,11 +978,14 @@ TABS.forEach((t,i)=>{const tab=$('#tab-'+t);
     if(j!=null){e.preventDefault();selectTab(TABS[j]);$('#tab-'+TABS[j]).focus();}});});
 
 /* ---------- wiring ---------- */
-$('#sel-scenario').addEventListener('change',e=>loadScenario(e.target.value));
-$('#sel-memory').addEventListener('change',e=>{$('#memory-hint').textContent=MEMORY_HINTS[e.target.value]||'';});
+$('#sel-scenario').addEventListener('change',e=>{e.target.title=e.target.selectedOptions[0]?e.target.selectedOptions[0].text:'';loadScenario(e.target.value);});
+$('#sel-memory').addEventListener('change',e=>{$('#memory-hint').textContent=MEMORY_HINTS[e.target.value]||'';e.target.title=MEMORY_HINTS[e.target.value]||'';});
 $('#btn-run').addEventListener('click',runAgent);
+$('#btn-hh-expand').addEventListener('click',toggleAll);
 $('#btn-reset').addEventListener('click',()=>withBusy($('#btn-reset'),'Resetting…',async()=>{
-  const r=await api('/api/reset',{});S.run=null;S.runScenario=null;S.asks={};
+  const r=await api('/api/reset',{});
+  S.seq++;                                                   /* every reply still in flight belongs to the old session */
+  S.run=null;S.runScenario=null;S.asks={};S.open={};
   S.forecast=null;$('#use-forecast').checked=false;fill($('#fc-result'));   /* server drops the forecast on reset */
   toast('New session '+fmtAny(r&&r.session),'ok');fill($('#note-verdict'));fill($('#nemo-handled'));
   await refreshState();renderAgent();renderKeeperRun();
@@ -870,6 +1004,11 @@ $('#drawer-close').addEventListener('click',()=>$('#drawer').close());
 $('#drawer').addEventListener('click',e=>{if(e.target!==e.currentTarget)return;const r=e.currentTarget.getBoundingClientRect();
   if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)e.currentTarget.close();});   /* backdrop only */
 (function(){const d=new Date();d.setDate(d.getDate()+1);$('#fc-date').value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
+(function(){   /* --top-h: the sticky bar's height (banner and #top-slot included), so the desktop columns fit under it */
+  const hd=$('header.top');if(!hd)return;
+  const set=()=>document.documentElement.style.setProperty('--top-h',Math.round(hd.getBoundingClientRect().height)+'px');
+  if(typeof ResizeObserver==='function')new ResizeObserver(set).observe(hd);else window.addEventListener('resize',set);
+  set();})();
 
 async function init(){
   renderAgent();renderKeeperRun();

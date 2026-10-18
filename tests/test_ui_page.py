@@ -82,3 +82,63 @@ def test_inner_html_only_for_trusted_chart_svg(html):
     assert html.count("innerHTML") == 1
     assert "createElement('template')" in html
     assert "textContent" in html
+
+
+def test_top_slot_is_the_last_child_of_the_header(html):
+    # present.js mounts its status pill and the Presenter toggle here.
+    header = re.search(r"<header class=\"top\">(.*?)</header>", html, re.S)
+    assert header
+    assert re.search(r'<div id="top-slot"></div>\s*$', header.group(1))
+    for hook in ('id="btn-run"', 'id="btn-reset"', 'id="sel-scenario"', 'id="sel-memory"'):
+        assert hook in header.group(1), hook
+    assert re.search(r"#top-slot\s*\{[^}]*display:\s*flex", html)
+    assert re.search(r"min-width:\s*1100px", html), "one-row bar breakpoint"
+
+
+def test_household_cards_collapse_with_an_expand_all_control(html):
+    assert 'id="btn-hh-expand"' in html and "Expand all" in html and "Collapse all" in html
+    assert "'hh-toggle'" in html and "'aria-expanded':open?'true':'false'" in html
+    # present.js finds cards and buttons by these
+    assert "'aria-label':'Household '+id" in html
+    assert "'aria-label':'Ask the household agent for '+id" in html
+    # keyboard focus survives a re-render: Save/Cancel return focus to the card's Edit button
+    assert "'data-fk':'edit:'+id" in html and "renderHouseholds('edit:'+id)" in html
+    assert "n.focus({preventScroll:true})" in html
+
+
+def test_desktop_columns_fit_the_viewport(html):
+    flat = html.replace(" ", "")
+    assert "max-height:calc(100vh-var(--top-h" in flat
+    assert "position:sticky;top:0" in flat
+    assert "--top-h" in html and "ResizeObserver" in html
+
+
+def test_seq_guard_against_stale_replies(html):
+    assert "const S={seq:0," in html
+    assert "const seq=++S.seq" in html, "scenario change bumps the sequence"
+    assert "S.seq++" in html, "reset bumps the sequence"
+    captures = html.count("const seq=S.seq")
+    checks = html.count("seq!==S.seq")
+    assert captures >= 10, captures
+    assert checks >= captures, (captures, checks)
+    for fn in ("async function loadScenario", "async function askHousehold", "async function saveHousehold",
+               "async function runAgent", "async function refreshBrain", "async function refreshState",
+               "async function refreshTools", "async function fetchForecast", "async function openExplain"):
+        body = html[html.index(fn):]
+        body = body[:body.index("\nasync function", 1) if "\nasync function" in body[1:] else len(body)]
+        assert "seq!==S.seq" in body, fn
+
+
+def test_tables_and_lists_wrap_instead_of_clipping(html):
+    flat = html.replace(" ", "")
+    assert "td{white-space:normal;overflow-wrap:anywhere}" in flat
+    assert ".tw{overflow-x:auto" in flat
+    assert ".entries>li{min-width:0" in flat
+    # evidence options drop the current scenario's prefix and keep the full text in the title
+    assert "r.scenario_id===S.scenarioName?rest:full,title:full" in html
+
+
+def test_runner_status_never_renders_an_empty_value(html):
+    assert "simple[k]='—'" in html
+    assert "simple[k]=v==null?'—':v" in html
+    assert "ks.length?ks.map(k=>k+': '+fmtAny(v[k])).join(' · '):'—'" in html
