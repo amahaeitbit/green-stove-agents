@@ -15,6 +15,7 @@ legend for >= 2 series plus selective direct end-labels, text in ink tokens
 from __future__ import annotations
 
 import math
+import re
 from html import escape
 from typing import Iterable
 
@@ -23,6 +24,10 @@ __all__ = ["line_chart", "bars", "sparkline"]
 _FONT = 11.0  # base font size (px) for axis/legend text
 _CHAR_W = 0.6  # rough glyph advance as a fraction of font size (for layout)
 _MAX_SERIES_COLORS = 4  # --c1..--c4; extra series fold into --muted, never cycled
+_NARROW_W = 420  # below this width: short limit labels, legend instead of direct end labels
+_LABEL_GAP = _FONT + 1  # minimum vertical distance between two in-plot labels (px)
+# "3 kW", "1.2 kWh", "80 %": a number followed by an optional unit token inside a limit name
+_NUM_UNIT = re.compile(r"(?<![\w.])(-?\d[\d,]*(?:\.\d+)?)\s*([A-Za-z%°][\w%°]*)?")
 
 
 # ---------------------------------------------------------------------------
@@ -117,6 +122,44 @@ def _clean(values: Iterable[object] | None) -> list[float | None]:
         return []
 
 
+def _limit_label(name: str, value: float, unit: str) -> tuple[str, str]:
+    """(full, short) label texts for a reference line.
+
+    full: the name when it already carries its value ("inverter 3 kW"), else "name value unit".
+    short: just the number and unit ("3 kW", "1.2 kWh") for narrow charts, where the legend
+    carries the names."""
+    m = _NUM_UNIT.search(name)
+    if m:
+        short = m.group(1) + (f" {m.group(2)}" if m.group(2) else "")
+        return name, short
+    if any(ch.isdigit() for ch in name):  # value already in the label, in some other form
+        return name, name
+    val = f"{_fmt(value)} {unit if '/' not in unit else ''}".strip()
+    return f"{name} {_fmt(value)} {unit}".strip(), val
+
+
+def _stack(desired: list[float], lo: float, hi: float, gap: float = _LABEL_GAP) -> list[float]:
+    """Resolve 1-D label collisions deterministically: keep the order of the desired positions,
+    push later (lower) labels down until neighbours are >= gap apart, then cascade back up so the
+    stack stays inside [lo, hi] whenever there is room."""
+    order = sorted(range(len(desired)), key=lambda i: (desired[i], i))
+    pos = list(desired)
+    prev: float | None = None
+    for i in order:
+        y = max(desired[i], lo)
+        if prev is not None and y < prev + gap:
+            y = prev + gap
+        pos[i] = prev = y
+    nxt: float | None = None
+    for i in reversed(order):
+        y = min(pos[i], hi)
+        if nxt is not None and y > nxt - gap:
+            y = nxt - gap
+        pos[i] = max(y, lo)
+        nxt = y
+    return pos
+
+
 # ---------------------------------------------------------------------------
 # line chart
 
@@ -141,6 +184,7 @@ def line_chart(series: dict[str, list[float]], *, limits: dict[str, float] | Non
         if f is not None:
             lims.append((str(k), f))
     emph = emphasis if emphasis in {n for n, _ in data} else None
+    narrow = width < _NARROW_W  # e.g. the interactive UI's ~330 px cards
 
     n = max((len(v) for _, v in data), default=0)
     finite = [x for _, vals in data for x in vals if x is not None]
@@ -166,7 +210,7 @@ def line_chart(series: dict[str, list[float]], *, limits: dict[str, float] | Non
     if x_hours:
         x_max = 24.0
         x_of_index = (lambda i: i * 24.0 / n) if n else (lambda i: 0.0)
-        x_ticks = [(float(h), f"{h:02d}") for h in range(0, 25, 3)]
+        x_ticks = [(float(h), f"{h:02d}") for h in range(0, 25, 6 if narrow else 3)]
     else:
         x_max = float(max(n - 1, 1))
         x_of_index = lambda i: float(i)  # noqa: E731
@@ -183,7 +227,8 @@ def line_chart(series: dict[str, list[float]], *, limits: dict[str, float] | Non
     if title:
         parts_head.append(_text(0, top + 12, title, size=13, fill="--ink", weight="600"))
         top += 20
-    legend_items = data if len(data) >= 2 else []
+    # legend for >= 2 series; a narrow chart always uses it (no room for direct end labels)
+    legend_items = data if (len(data) >= 2 or (narrow and data)) else []
     if legend_items:
         lx, ly = 0.0, top + 10
         for i, (name, _) in enumerate(legend_items):
@@ -200,7 +245,7 @@ def line_chart(series: dict[str, list[float]], *, limits: dict[str, float] | Non
     top += 18 if unit else 8  # room above the plot for the unit label
     tick_labels = [_fmt(v) for v in ticks]
     left = max(max((_text_w(s) for s in tick_labels), default=0.0), _text_w(unit)) + 8
-    direct = len(data) <= _MAX_SERIES_COLORS and has_data
+    direct = len(data) <= _MAX_SERIES_COLORS and has_data and not narrow
     right = 10.0
     if direct:
         right = min(max((_text_w(nm) for nm, _ in data), default=0.0) + 12, width * 0.25)
@@ -227,7 +272,7 @@ def line_chart(series: dict[str, list[float]], *, limits: dict[str, float] | Non
             where = _hhmm(i_pk * 1440 / n) if x_hours and n else str(i_pk)
             summary.append(f"{name} peak {_fmt(v_pk)} {unit} at {where}".replace("  ", " "))
         for name, v in lims:
-            summary.append(f"{name} {_fmt(v)} {unit}".strip())
+            summary.append(_limit_label(name, v, unit)[0])  # never repeats a value the name carries
     else:
         summary.append("no data")
     out.append(_svg_open(width, height, ". ".join(s for s in summary if s)))
@@ -250,18 +295,36 @@ def line_chart(series: dict[str, list[float]], *, limits: dict[str, float] | Non
     for xv, s in x_ticks:
         out.append(_text(sx(xv), top + ph + 14, s, anchor="middle"))
 
-    # --- limits: dashed reference lines, labeled in-plot at the right end ---
+    # --- limits: dashed reference lines (labels are drawn after the series, on top) ---
+    label_text: list[str] = []
+    label_want: list[float] = []
+    seen_labels: set[str] = set()
     for name, v in lims:
         y = sy(v)
         out.append(
             f'<path d="M{_c(left)} {_c(y)}H{_c(left + pw)}" stroke="var(--limit,currentColor)" '
             f'stroke-width="1.5" stroke-dasharray="5 4" data-limit="{escape(name, quote=True)}"/>'
         )
-        lab = name if any(ch.isdigit() for ch in name) else f"{name} {_fmt(v)} {unit}".strip()   # value already in label
-        ly = y - 4 if y - 4 > top + 8 else y + 12
-        out.append(_text(left + pw - 2, ly, lab, anchor="end", fill="--ink"))
+        full, short = _limit_label(name, v, unit)
+        lab = short if narrow else full
+        if not lab or lab in seen_labels:  # same text twice: draw it once
+            continue
+        seen_labels.add(lab)
+        label_text.append(lab)
+        label_want.append(y - 4 if y - 4 >= top + 9 else y + 12)  # above the line, else below
+    # stack colliding labels (>= _LABEL_GAP apart) and keep them inside the plot
+    label_pos = _stack(label_want, top + 9, top + ph - 2)
+    limit_labels: list[str] = []
+    for lab, ly in zip(label_text, label_pos):
+        tw = _text_w(lab)
+        limit_labels.append(
+            f'<rect x="{_c(left + pw - 5 - tw)}" y="{_c(ly - 10)}" width="{_c(tw + 6)}" height="13" rx="2" '
+            f'fill="var(--panel,var(--bg,canvas))" fill-opacity="0.9"/>'
+            + _text(left + pw - 2, ly, lab, anchor="end", fill="--ink")
+        )
 
     if not has_data:
+        out.extend(limit_labels)
         out.append(_text(left + pw / 2, top + ph / 2, "No data", anchor="middle"))
         out.append("</svg>")
         return "".join(out)
@@ -295,6 +358,9 @@ def line_chart(series: dict[str, list[float]], *, limits: dict[str, float] | Non
             f'stroke-linejoin="round" stroke-linecap="round" '
             f'data-series="{escape(name, quote=True)}"/>'
         )
+
+    # --- limit labels on top of the lines, each on a translucent panel-colored tile ---
+    out.extend(limit_labels)
 
     # --- direct end labels (skip any that would collide; legend carries it) -
     if direct:
