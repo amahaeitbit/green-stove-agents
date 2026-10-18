@@ -1,10 +1,13 @@
 /* Green-Stove presenter mode: high-visibility styles for a projector or shared screen.
    Loaded after index.html's own <style>. Everything that restyles the page is scoped under
    body.presenter, so the default view is unchanged. Only the elements present.js adds
-   (#gs-presenter-toggle, .gs-kbd) have styles outside presenter mode.
-   Hooks: #gs-hero (.ok .bad .warn .purple; status word = .gs-word or the first child;
-   tiles .gs-tile > .v + .k, optional row .gs-tiles), #gs-steps > .gs-step(.done .current),
-   number badge .gs-step > .n, .gs-flash, #gs-presenter-toggle, .gs-kbd,
+   (#gs-presenter-toggle, #gs-mini, the #top-slot / .gs-slot row, .gs-kbd) have styles outside presenter mode.
+   Every colour comes from the page's variables (:root light + dark), so both themes stay readable.
+   Hooks: #gs-hero (.ok .bad .warn .purple; .gs-head > .gs-word (status) + .gs-hero-sub (.gs-scn scenario, .gs-reason);
+   tiles .gs-tile > .v + .k in .gs-tiles; .gs-foot > .gs-trail + .gs-hero-note),
+   #gs-mini (.ok .bad .warn .purple; [hidden] while the hero is in view or there is no run),
+   #gs-steps > .gs-strip > .gs-step(.done .current) with number badge .n and label .gs-step-l, .gs-help,
+   .gs-flash, #gs-presenter-toggle, .gs-kbd,
    and tone overrides .gs-tone-ok .gs-tone-bad .gs-tone-warn .gs-tone-purple for chips whose
    status the page cannot express by class (APPROVAL_REQUIRED is .chip.info, INFEASIBLE is .chip.bad). */
 
@@ -105,34 +108,46 @@ body.presenter .gs-tone-bad,body.presenter .chip.gs-tone-bad,body.presenter .bad
 body.presenter .gs-tone-warn,body.presenter .chip.gs-tone-warn,body.presenter .badge.gs-tone-warn{background:var(--warn);color:var(--panel);box-shadow:none}
 body.presenter .gs-tone-purple,body.presenter .chip.gs-tone-purple,body.presenter .badge.gs-tone-purple{background:var(--c4);color:var(--panel);box-shadow:none}
 
-/* ---------- #gs-hero: summary banner under the top bar ---------- */
+
+/* ---------- #gs-hero: compact summary banner under the top bar ---------- */
 body:not(.presenter) #gs-hero,body:not(.presenter) #gs-steps{display:none}
-body.presenter #gs-hero{display:flex;flex-wrap:wrap;align-items:center;gap:14px 22px;width:calc(100% - 32px);max-width:1568px;margin:18px auto 0;
-  padding:18px 22px;background:var(--panel);color:var(--ink);border:2px solid var(--line);border-left-width:10px;border-radius:var(--radius);box-shadow:var(--shadow);min-width:0}
+body.presenter #gs-hero{display:flex;flex-wrap:wrap;align-items:center;gap:6px 18px;width:calc(100% - 32px);max-width:1568px;margin:10px auto 0;
+  padding:10px 16px 10px 18px;background:var(--panel);color:var(--ink);border:2px solid var(--line);border-left-width:10px;border-radius:var(--radius);box-shadow:var(--shadow);min-width:0}
 body.presenter main>#gs-hero,body.presenter main>#gs-steps{grid-column:1/-1;width:auto;max-width:none;margin:0}
-body.presenter #gs-hero>:first-child:not(.gs-tile):not(.gs-tiles),body.presenter #gs-hero .gs-word{flex:0 1 auto;min-width:0;font-size:clamp(28px,5.2vw,56px);font-weight:850;line-height:1.05;letter-spacing:.01em;overflow-wrap:anywhere}
-body.presenter #gs-hero .gs-tiles{display:flex;flex-wrap:wrap;gap:12px;flex:3 1 560px;min-width:0}
-body.presenter #gs-hero>:has(>.gs-tile){display:flex;flex-wrap:wrap;gap:12px;flex:1 1 420px;min-width:0}
-body.presenter .gs-tile{flex:1 1 160px;min-width:0;background:var(--panel);color:var(--ink);border:2px solid var(--line);border-radius:12px;padding:10px 14px}
-body.presenter .gs-tile .v{font-size:clamp(20px,2.5vw,34px);font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-body.presenter .gs-tile .k{margin-top:3px;font-size:14px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;overflow-wrap:anywhere}
+body.presenter #gs-hero>.gs-head{flex:1 1 300px;min-width:0;display:flex;flex-direction:column;gap:2px}
+body.presenter #gs-hero .gs-word{min-width:0;font-size:clamp(24px,3.4vw,44px);font-weight:850;line-height:1.05;letter-spacing:.01em;overflow-wrap:anywhere}
+body.presenter #gs-hero .gs-hero-sub{font-size:15px;font-weight:600;line-height:1.35;color:var(--muted);overflow-wrap:anywhere}
+body.presenter #gs-hero .gs-hero-sub .gs-scn{color:var(--ink);font-weight:800}
+body.presenter #gs-hero .gs-tiles{display:flex;flex-wrap:wrap;gap:8px;flex:3 1 520px;min-width:0}
+body.presenter #gs-hero .gs-tiles[hidden]{display:none}
+body.presenter .gs-tile{flex:1 1 130px;min-width:0;background:var(--panel);color:var(--ink);border:2px solid var(--line);border-radius:10px;padding:6px 10px}
+body.presenter .gs-tile .v{font-size:clamp(18px,2vw,27px);font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body.presenter .gs-tile .k{margin-top:2px;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;line-height:1.25;overflow-wrap:anywhere}
 body.presenter .gs-tile.ok .v{color:var(--ok)}
 body.presenter .gs-tile.bad .v{color:var(--bad)}
 body.presenter .gs-tile.warn .v{color:var(--warn)}
+body.presenter #gs-hero>.gs-foot{flex:1 1 100%;display:flex;flex-wrap:wrap;gap:2px 18px;min-width:0;font-size:14px;font-weight:650;line-height:1.35;color:var(--muted)}
+body.presenter #gs-hero>.gs-foot[hidden]{display:none}
+body.presenter #gs-hero .gs-trail,body.presenter #gs-hero .gs-hero-note{min-width:0;overflow-wrap:anywhere}
+body.presenter #gs-hero .gs-hero-note{color:var(--ink)}
 body.presenter #gs-hero.ok{border-color:var(--ok);background:var(--ok-bg)}
 body.presenter #gs-hero.bad{border-color:var(--bad);background:var(--bad-bg)}
 body.presenter #gs-hero.warn{border-color:var(--warn);background:var(--warn-bg)}
 body.presenter #gs-hero.purple{border-color:var(--c4)}
-body.presenter #gs-hero.ok>:first-child:not(.gs-tile):not(.gs-tiles),body.presenter #gs-hero.ok .gs-word{color:var(--ok)}
-body.presenter #gs-hero.bad>:first-child:not(.gs-tile):not(.gs-tiles),body.presenter #gs-hero.bad .gs-word{color:var(--bad)}
-body.presenter #gs-hero.warn>:first-child:not(.gs-tile):not(.gs-tiles),body.presenter #gs-hero.warn .gs-word{color:var(--warn)}
-body.presenter #gs-hero.purple>:first-child:not(.gs-tile):not(.gs-tiles),body.presenter #gs-hero.purple .gs-word{color:var(--c4)}
+body.presenter #gs-hero.ok .gs-word{color:var(--ok)}
+body.presenter #gs-hero.bad .gs-word{color:var(--bad)}
+body.presenter #gs-hero.warn .gs-word{color:var(--warn)}
+body.presenter #gs-hero.purple .gs-word{color:var(--c4)}
 
-/* ---------- #gs-steps: horizontal guide strip ---------- */
-body.presenter #gs-steps{display:flex;flex-wrap:wrap;gap:8px;list-style:none;width:calc(100% - 32px);max-width:1568px;margin:12px auto 0;padding:0;min-width:0}
+/* ---------- #gs-steps: guide strip (one row that scrolls sideways; wraps into equal cells from 900 px) ---------- */
+body.presenter #gs-steps{display:flex;flex-direction:column;gap:4px;list-style:none;width:calc(100% - 32px);max-width:1568px;margin:8px auto 0;padding:0;min-width:0}
 body.presenter #gs-hero>#gs-steps{flex:1 1 100%;width:100%;margin:0}
-body.presenter .gs-step{flex:1 1 150px;min-width:0;display:flex;align-items:center;gap:8px;margin:0;padding:9px 12px;border:2px solid var(--line);border-radius:12px;
-  background:var(--panel);color:var(--muted);font-size:15px;font-weight:650;line-height:1.3;overflow-wrap:anywhere;text-align:left}
+body.presenter .gs-strip{display:flex;flex-wrap:nowrap;align-items:stretch;gap:8px;min-width:0;max-width:100%;overflow-x:auto;overflow-y:hidden;padding:4px 4px 6px;
+  scrollbar-width:thin;-webkit-overflow-scrolling:touch}
+body.presenter .gs-step{flex:0 0 auto;min-width:0;min-height:44px;display:flex;align-items:center;gap:8px;margin:0;padding:5px 14px 5px 7px;border:2px solid var(--line);border-radius:12px;
+  background:var(--panel);color:var(--muted);font-size:15px;font-weight:650;line-height:1.25;text-align:left;white-space:nowrap;cursor:pointer}
+body.presenter .gs-step:hover{border-color:var(--muted);color:var(--ink)}
+body.presenter .gs-step>.gs-step-l{min-width:0;overflow:hidden;text-overflow:ellipsis}
 body.presenter .gs-step.done{border-color:var(--ok);background:var(--ok-bg);color:var(--ok)}
 body.presenter .gs-step.current{border-color:var(--accent);background:var(--accent);color:var(--accent-ink);font-weight:800;
   box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 30%,transparent)}
@@ -140,6 +155,11 @@ body.presenter .gs-step>.n,body.presenter .gs-step>.num{flex:0 0 auto;display:in
   background:var(--mut-bg);color:var(--ink);font-weight:800;font-variant-numeric:tabular-nums}
 body.presenter .gs-step.done>.n,body.presenter .gs-step.done>.num{background:var(--ok);color:var(--panel)}
 body.presenter .gs-step.current>.n,body.presenter .gs-step.current>.num{background:var(--accent-ink);color:var(--accent)}
+body.presenter .gs-help{font-size:13px;color:var(--muted);line-height:1.4;padding:0 4px}
+@media (min-width:900px){
+  body.presenter .gs-strip{flex-wrap:wrap;overflow:visible;padding:0}
+  body.presenter .gs-step{flex:1 1 0}
+}
 
 /* ---------- .gs-flash: 1.6 s highlight pulse ---------- */
 @keyframes gs-flash{
@@ -157,13 +177,30 @@ body.presenter .gs-flash{outline:3px solid transparent;outline-offset:3px;animat
 }
 
 /* ---------- elements visible in both modes ---------- */
-#gs-presenter-toggle{position:fixed;right:16px;bottom:16px;z-index:55;display:inline-flex;align-items:center;gap:6px;min-height:36px;max-width:calc(100vw - 32px);
-  padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--ink);font-size:13px;font-weight:650;line-height:1.3;
-  box-shadow:0 4px 14px rgba(0,0,0,.18);cursor:pointer;opacity:.92}
-#gs-presenter-toggle:hover{opacity:1;border-color:var(--muted)}
+/* the header row that holds #gs-mini and #gs-presenter-toggle: #top-slot comes from index.html (zero-specificity
+   defaults, so the page's own rules win), .gs-slot is the row present.js adds when the page has no #top-slot */
+:where(#top-slot),.gs-slot{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:6px 8px;max-width:1600px;margin:0 auto;padding:4px 16px 7px;min-width:0}
+#gs-presenter-toggle{display:inline-flex;align-items:center;gap:6px;min-height:28px;max-width:100%;padding:3px 11px;border:1px solid var(--line);border-radius:999px;
+  background:var(--panel);color:var(--ink);font-size:12.5px;font-weight:650;line-height:1.3;white-space:nowrap;cursor:pointer}
+#gs-presenter-toggle:hover{border-color:var(--muted)}
 #gs-presenter-toggle:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
-body.presenter #gs-presenter-toggle{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-size:15px;opacity:1}
-body:has(#gs-presenter-toggle) #toasts{bottom:64px}
+body.presenter #gs-presenter-toggle{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-size:13.5px}
+body.presenter #gs-presenter-toggle:hover{filter:brightness(1.1)}
+/* #gs-mini: "STATUS · n calls · $cost · memory" pill, shown only while #gs-hero is scrolled out of view */
+#gs-mini{display:inline-block;min-height:28px;max-width:100%;min-width:0;padding:3px 12px;border:2px solid var(--line);border-radius:999px;background:var(--panel);color:var(--ink);
+  font-size:13.5px;font-weight:800;line-height:1.4;letter-spacing:.01em;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;cursor:pointer}
+#gs-mini.ok{border-color:var(--ok);background:var(--ok-bg);color:var(--ok)}
+#gs-mini.bad{border-color:var(--bad);background:var(--bad-bg);color:var(--bad)}
+#gs-mini.warn{border-color:var(--warn);background:var(--warn-bg);color:var(--warn)}
+#gs-mini.purple{border-color:var(--c4);background:color-mix(in srgb,var(--c4) 16%,var(--panel));color:var(--c4)}
+#gs-mini:hover{filter:brightness(.96)}
+#gs-mini:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+#gs-mini[hidden],body:not(.presenter) #gs-mini{display:none!important}
+/* fallback when the page has neither #top-slot nor header.top: the toggle floats bottom-right, the mini top-right */
+body>#gs-presenter-toggle{position:fixed;right:16px;bottom:16px;z-index:55;min-height:36px;padding:6px 12px;max-width:calc(100vw - 32px);box-shadow:0 4px 14px rgba(0,0,0,.18);opacity:.92}
+body>#gs-presenter-toggle:hover{opacity:1}
+body:has(>#gs-presenter-toggle) #toasts{bottom:64px}
+body>#gs-mini{position:fixed;top:8px;right:16px;z-index:55;max-width:calc(100vw - 32px);box-shadow:0 4px 14px rgba(0,0,0,.18)}
 .gs-kbd{display:inline-flex;align-items:center;justify-content:center;min-width:1.7em;padding:0 6px;border:1px solid var(--line);border-bottom-width:3px;border-radius:6px;
   background:var(--panel);color:var(--ink);font-family:var(--mono);font-size:12px;font-weight:700;line-height:1.6;white-space:nowrap}
 body.presenter .gs-kbd{font-size:14px}
@@ -177,7 +214,15 @@ body.presenter #gs-presenter-toggle .gs-kbd{background:transparent;color:inherit
   body.presenter .panel{padding:16px}
   body.presenter .chip{white-space:normal;overflow-wrap:anywhere}
   body.presenter nav.tabs button{font-size:15px;padding:8px 12px}
-  body.presenter #gs-hero{padding:14px 16px;border-left-width:8px}
-  body.presenter .gs-step{flex-basis:130px}
+  body.presenter #gs-hero{padding:10px 12px 10px 14px;border-left-width:8px;gap:8px 12px}
+  body.presenter #gs-hero>.gs-head{flex-basis:100%}
+  body.presenter #gs-hero .gs-word{font-size:clamp(22px,7vw,34px)}
+  body.presenter #gs-hero .gs-hero-sub{font-size:14px}
+  body.presenter #gs-hero .gs-tiles{flex-basis:100%;gap:6px}
+  body.presenter .gs-tile{flex:0 0 calc(50% - 3px);max-width:calc(50% - 3px);padding:6px 8px}
+  body.presenter .gs-tile .v{font-size:20px}
+  body.presenter .gs-tile .k{font-size:11px}
+  body.presenter .gs-help{display:none}
   body.presenter td.wrap{min-width:160px}
+  :where(#top-slot),.gs-slot{justify-content:flex-start}
 }
