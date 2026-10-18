@@ -83,18 +83,27 @@ header.top{background:var(--panel);border-bottom:1px solid var(--line);position:
 }
 @media (min-width:1100px){
   /* one compact row: title + badges left, Scenario/Memory/Run/Reset right */
-  body header.top .top-inner{padding:6px 16px;flex-wrap:nowrap;gap:8px 14px}
-  .brand{flex:1 1 0;flex-wrap:nowrap;overflow:hidden}
+  /* one row when it fits; otherwise the controls wrap under the title instead of crushing the badges
+     (the presenter theme makes the Run button and the title wider) */
+  body header.top .top-inner{padding:6px 16px;flex-wrap:wrap;gap:6px 14px;min-width:0}
+  .brand{flex:1 1 auto;flex-wrap:nowrap;overflow:hidden;min-width:0}
   .brand h1{font-size:16px;white-space:nowrap;flex:0 0 auto}
-  .brand .badge{flex:0 1 auto;min-width:0}
-  #badge-model{flex-shrink:3;max-width:260px}
-  #badge-session{flex-shrink:2}
+  .brand .badge{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* text-only chips: inline-block so text-overflow can draw the ellipsis (it is ignored on flex boxes) */
+  #badge-model,#badge-world,#badge-session{display:inline-block;line-height:1.45}
+  #badge-mode{flex-shrink:0}
+  #badge-model{max-width:220px}
+  #badge-world{max-width:250px}
+  #badge-session{display:none}
   .controls{flex:0 0 auto;flex-wrap:nowrap;align-items:center;gap:8px}
   .controls label.field{flex-direction:row;align-items:center;gap:6px}
   .controls .lbl,.controls .hint{position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
   header.top .top-inner .controls>.btn,header.top .top-inner .controls>#btn-run{margin-top:0}
   .controls #sel-scenario{width:min(250px,19vw)}
   .controls #sel-memory{width:min(185px,14vw)}
+}
+@media (min-width:1500px){
+  #badge-session{display:inline-flex;max-width:220px}
 }
 /* tabs + panels */
 nav.tabs{display:none}
@@ -495,7 +504,7 @@ function renderTop(){
   const mode=String(st.mode||'unknown');const live=/live|crusoe/i.test(mode);
   const mb=$('#badge-mode');mb.textContent=live?'LIVE':(/mock/i.test(mode)?'MOCK':mode.toUpperCase());mb.className='badge '+(live?'live':'mock');
   const mdl=$('#badge-model');if(st.model){mdl.hidden=false;mdl.textContent=fmtAny(st.model);mdl.title='model '+fmtAny(st.model);}else mdl.hidden=true;
-  $('#badge-world').textContent='world '+fmtAny(st.world);
+  $('#badge-world').textContent='world '+fmtAny(st.world);$('#badge-world').title='world '+fmtAny(st.world);
   const ses=fmtAny(st.session);$('#badge-session').textContent='session '+(ses.length>14?ses.slice(0,14)+'…':ses);$('#badge-session').title='session '+ses;
   const ban=$('#banner');
   if(!live){ban.hidden=false;ban.textContent='MOCK mode: the agents’ replies come from a scripted stand-in model, not a live LLM. The world, checks and Keeper decisions run normally; treat model output as a dry run.';}
