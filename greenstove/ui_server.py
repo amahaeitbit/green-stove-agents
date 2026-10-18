@@ -321,8 +321,9 @@ class Session:
                 series["battery (kWh)"] = down.battery_kwh
             limits = {f"inverter {ctx.inverter_kw:g} kW": ctx.inverter_kw,
                       f"reserve {ctx.reserve_kwh:g} kWh": ctx.reserve_kwh}
+            # narrow chart: the UI column is ~330-450 px, so short limit labels and a legend
             chart = line_chart(series, limits=limits, title="Selected plan on the downside forecast",
-                               y_unit="kW / kWh", emphasis="demand (kW)")
+                               y_unit="kW / kWh", emphasis="demand (kW)", width=400, height=200)
         return {"run": run, "bookings": bookings, "messages": messages,
                 "notes": [{"action": r.action, "code": r.code, "observation_id": r.observation_id,
                            "reasons": list(r.reasons)} for r in rec.notes],
@@ -426,7 +427,7 @@ class Session:
                     "quote": getattr(rec.accepted, "quote", None) if rec.accepted else None,
                     "pv_kwh": rec.pv_kwh, "downside_pv_kwh": rec.downside_pv_kwh, "clear_sky_kwh": rec.clear_sky_kwh,
                     "chart_svg": line_chart({"forecast PV": rec.forecast_pv_kw, "downside PV": rec.downside_pv_kw},
-                                            y_unit="kW"),
+                                            y_unit="kW", width=400, height=180),
                     "rejected": [str(r.get("reason")) for r in rec.rejected]}
 
     # ---- always-on runner ----------------------------------------------------------------
